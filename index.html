@@ -362,7 +362,10 @@ function reset(){
    hace que un sinte suene a nave y no a pitido de microondas. */
 const SFX = (()=>{
   let ctx=null, master=null, rever=null, amb=null, pingId=null, on=false, modo='calma';
-  const MAESTRO = 1.0;
+  /* Ganancia general de TODO el juego: ambiente, avisos y golpes. Es el unico
+     sitio donde subir o bajar el volumen global; los MODOS de abajo solo
+     equilibran las capas entre si. */
+  const MAESTRO = 0.63;
   /* Cada modo es una mezcla distinta: mismo motor, distinta tension.
      El drone es SOPORTE, no protagonista: a 0,17 se comia la mezcla y resultaba
      invasivo durante la validacion, 18 dB por encima de la capa de aire. Va
