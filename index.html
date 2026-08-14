@@ -42,9 +42,23 @@ button{cursor:pointer;border:none;background:none}
 :focus-visible{outline:2px solid var(--green);outline-offset:2px}
 
 
-#viewport{position:fixed;inset:0;display:grid;place-items:center;background:#000}
-#stage{width:1280px;height:720px;position:relative;overflow:hidden;
+/* El lienzo mide 1280x720 FIJOS y se escala. No se puede centrar con grid:
+   place-items solo centra bien mientras el hijo quepa, y en cuanto la ventana
+   baja de 1280 px —cualquier movil— el lienzo se iba entero fuera de pantalla
+   y quedaba en negro. Anclado al 50% y traido con translate, el centrado no
+   depende de si cabe. */
+#viewport{position:fixed;inset:0;overflow:hidden;background:#000}
+#stage{width:1280px;height:720px;position:absolute;left:50%;top:50%;overflow:hidden;
   transform-origin:center center;background:var(--abyss);box-shadow:0 0 90px rgba(5,221,77,.13)}
+
+/* Movil en vertical: el lienzo es 16:9 y encogido a 376 px de ancho el texto
+   quedaria en 5 px. Se pide girar en vez de servir algo ilegible. */
+#gira{position:fixed;inset:0;z-index:100;display:none;place-items:center;
+  background:#01332B;color:#DBFFF0;text-align:center;padding:40px}
+#gira.on{display:grid}
+#gira .icono{font-size:54px;margin-bottom:18px;display:block}
+#gira h2{margin:0 0 10px;font-family:var(--disp);font-size:20px;letter-spacing:.08em;color:#05DD4D}
+#gira p{margin:0;font-size:15px;opacity:.85;max-width:320px}
 .screen{position:absolute;inset:0;display:flex;flex-direction:column;animation:fadein .35s ease both}
 @keyframes fadein{from{opacity:0}to{opacity:1}}
 
@@ -306,6 +320,13 @@ th{font-family:var(--disp);font-size:10px;letter-spacing:.14em;color:rgba(219,25
 </head>
 <body>
 <div id="viewport"><div id="stage"></div></div>
+<div id="gira">
+  <div>
+    <span class="icono">📱</span>
+    <h2>GIRA EL DISPOSITIVO</h2>
+    <p>La consola trabaja en horizontal. Pon el teléfono de lado para continuar.</p>
+  </div>
+</div>
 
 <script>
 'use strict';
@@ -560,8 +581,16 @@ function capaUltimo(encendida){
     stage.appendChild(d);
   } else if(!encendida && hay){ hay.remove(); }
 }
-function ajustar(){ stage.style.transform='scale('+Math.min(innerWidth/1280, innerHeight/720)+')'; }
+function ajustar(){
+  const k = Math.min(innerWidth/1280, innerHeight/720);
+  /* translate primero, escala despues: el lienzo queda centrado quepa o no. */
+  stage.style.transform = 'translate(-50%,-50%) scale(' + k + ')';
+  /* Telefono en vertical: a esta escala el texto seria ilegible. */
+  const vertical = innerHeight > innerWidth && innerWidth < 700;
+  document.getElementById('gira').classList.toggle('on', vertical);
+}
 addEventListener('resize', ajustar);
+addEventListener('orientationchange', ajustar);
 
 /* ---------------- Pantallas ---------------- */
 function pCargando(msg){
