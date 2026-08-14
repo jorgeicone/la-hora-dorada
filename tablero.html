@@ -181,7 +181,7 @@ footer a{color:var(--green)}
       <table>
         <thead><tr>
           <th>#</th><th>EQUIPO</th><th>ESTADO</th><th>SIGNOS VITALES</th>
-          <th>ACIERTOS</th><th>REINTENTOS</th><th>TIEMPO</th><th>PUNTOS</th>
+          <th>ACIERTOS</th><th>ESTACIONES</th><th>TIEMPO</th><th>PUNTOS</th>
         </tr></thead>
         <tbody id="tb"></tbody>
       </table>
@@ -241,7 +241,7 @@ let avisoT;
 function aviso(m,err){ const a=$('aviso'); a.textContent=m; a.classList.toggle('err',!!err);
   a.classList.add('on'); clearTimeout(avisoT); avisoT=setTimeout(()=>a.classList.remove('on'),5000); }
 
-let ultimo=[], totalEstaciones=4;
+let ultimo=[], totalEstaciones=4, totalPreguntas=16, maxPuntos=80;
 
 async function cargar(){
   try{
@@ -249,7 +249,14 @@ async function cargar(){
     if(cfg && cfg.juego){
       $('tit').textContent = cfg.juego.titulo;
       $('sub').textContent = cfg.juego.subtitulo;
-      totalEstaciones = (cfg.estaciones||[]).length || 4;
+      const est = cfg.estaciones||[];
+      totalEstaciones = est.length || 4;
+      // Máximos calculados del contenido, no fijos: si cambia el juego, el tablero sigue.
+      totalPreguntas = est.reduce((a,e)=>a+e.preguntas.length+(e.candadoDespues?1:0), 0) || 16;
+      const bono = Math.max(...(cfg.bonosTiempo||[{puntos:6}]).map(b=>b.puntos));
+      maxPuntos = est.reduce((a,e)=>{
+        const pts = e.preguntas.reduce((x,q)=>x+q.puntos,0) + (e.candadoDespues?e.candadoDespues.puntos:0);
+        return a + pts + bono; }, 0) || 80;
       document.title = 'Tablero · ' + cfg.juego.titulo + ' | Solventum';
     }
     ultimo = rank || [];
@@ -288,10 +295,10 @@ function pintar(f){
             ? '<span class="chip fin">TERMINÓ</span>'
             : '<span class="chip cur">EN JUEGO</span>'}</td>
       <td><div class="barra">${barra}</div></td>
-      <td class="num">${x.aciertos}</td>
-      <td class="num">${x.intentos}</td>
+      <td class="num">${x.aciertos}<span style="opacity:.45">/${totalPreguntas}</span></td>
+      <td class="num">${x.estaciones}<span style="opacity:.45">/${totalEstaciones}</span></td>
       <td class="num">${mmss(x.duracion_seg)}</td>
-      <td class="total">${x.puntos}</td>
+      <td class="total">${x.puntos}<span style="font-size:.62em;opacity:.45">/${maxPuntos}</span></td>
     </tr>`;
   }).join('');
 }
@@ -299,11 +306,11 @@ function pintar(f){
 $('csv').addEventListener('click',()=>{
   if(!ultimo.length) return aviso('No hay datos para exportar.',true);
   const q = v => '"'+String(v??'').replace(/"/g,'""')+'"';
-  const cab = ['Posicion','Equipo','Jornada','Estado','Signos vitales','Aciertos',
-               'Reintentos','Duracion (mm:ss)','Duracion (seg)','Puntos'];
+  const cab = ['Posicion','Equipo','Jornada','Estado','Estaciones','Aciertos',
+               'Duracion (mm:ss)','Duracion (seg)','Puntos','Puntos maximos'];
   const filas = ultimo.map((x,i)=>[i+1,x.equipo,x.jornada,x.estado,
-    x.estaciones+'/'+totalEstaciones,x.aciertos,x.intentos,
-    mmss(x.duracion_seg),x.duracion_seg,x.puntos].map(q).join(';'));
+    x.estaciones+'/'+totalEstaciones, x.aciertos+'/'+totalPreguntas,
+    mmss(x.duracion_seg),x.duracion_seg,x.puntos,maxPuntos].map(q).join(';'));
   const csv = '﻿'+[cab.map(q).join(';'),...filas].join('\r\n');
   const url = URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));
   Object.assign(document.createElement('a'),{href:url,download:'la-hora-dorada-tablero.csv'}).click();
