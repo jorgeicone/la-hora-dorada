@@ -436,11 +436,17 @@ function pPregunta(){
       `<button class="opt" data-single="${i}"><span class="box">${'ABCD'[i]||i+1}</span>${esc(o.texto)}</button>`).join('');
   }
   const seg = segDe(e,q);
+  // El candado va DESPUÉS de las preguntas: no es "4/3", es la clave de salida.
+  const esCandado = S.q >= e.preguntas.length;
   pinta(`<div class="screen">${fondoDe(e.fondo)}
     <div class="layer">${barra({reloj:seg!=null, atras:true})}${vitales()}
       <div class="wrap"><div class="panel">
-        <div class="qnum">${S.q+1}/${e.preguntas.length}</div>
+        ${esCandado
+          ? `<div class="kicker" style="margin-bottom:14px">${esc(q.titulo || 'CLAVE DE SALIDA')}</div>`
+          : `<div class="qnum">${S.q+1}/${e.preguntas.length}</div>`}
         <p class="qtext">${esc(q.enunciado)}</p>
+        ${esCandado && q.pista
+          ? `<p style="font-size:14px;color:var(--amber);margin:-10px 0 18px">▸ ${esc(q.pista)}</p>` : ''}
         <div id="cuerpo">${cuerpo}</div>
         <div class="qfoot"><button class="btn solid" id="enviar" data-a="enviar">${esc(T.enviar)}</button></div>
       </div></div></div></div>`);
