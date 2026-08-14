@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<!--
+  ============================================================================
+  LA HORA DORADA — Tablero del facilitador
+  Cliente: Solventum · © 2026 Jorge Hugo Pérez Gaona
+
+  Pensado para PROYECTAR en la sala: tipografía grande, alto contraste y
+  lectura desde lejos. No es la consola de los equipos.
+  Se refresca solo cada 5 segundos contra evoforma2_ranking.
+  ============================================================================
+-->
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#02120E">
+<meta name="robots" content="noindex, nofollow">
+<title>Tablero · La Hora Dorada | Solventum</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --green:#05DD4D; --green-soft:#3BFF7E; --abyss:#02120E; --mint:#DBFFF0;
+  --alarm:#FF4438; --amber:#FFC24A; --teal:#0A7B6B;
+  --panel:rgba(2,26,21,.8); --line:rgba(5,221,77,.34);
+  --oro:#FFC94A; --plata:#C9DCD6; --bronce:#D08A4E;
+  --disp:'Orbitron',system-ui,sans-serif; --body:'Inter',system-ui,sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{
+  min-height:100vh;font-family:var(--body);color:var(--mint);
+  background:
+    radial-gradient(90% 70% at 50% -10%,rgba(5,221,77,.14),transparent 60%),
+    linear-gradient(175deg,#02120E,#01221C 55%,#02120E);
+  background-attachment:fixed;-webkit-font-smoothing:antialiased;
+}
+button,input{font:inherit;color:inherit}
+button{cursor:pointer;border:none;background:none}
+:focus-visible{outline:2px solid var(--green);outline-offset:3px}
+.wrap{width:min(1500px,100%);margin:0 auto;padding:0 28px}
+
+header{position:sticky;top:0;z-index:20;background:rgba(2,18,14,.92);
+  backdrop-filter:blur(12px);border-bottom:1px solid rgba(219,255,240,.14)}
+.hd{width:min(1500px,100%);margin:0 auto;padding:16px 28px;
+  display:flex;align-items:center;gap:20px;flex-wrap:wrap}
+.logo{display:flex;align-items:center;gap:14px}
+.logo svg{height:26px;width:auto;display:block}
+.logo .sep{width:1px;height:26px;background:rgba(219,255,240,.2)}
+.logo .t{font-family:var(--disp);font-size:14px;letter-spacing:.2em;color:var(--green)}
+.logo .t small{display:block;font-family:var(--body);font-size:12px;letter-spacing:.02em;
+  color:var(--mint);opacity:.55;text-transform:none}
+.hd .der{margin-left:auto;display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+.vivo{display:flex;align-items:center;gap:9px;font-family:var(--disp);font-size:11px;
+  letter-spacing:.16em;color:var(--green);background:rgba(5,221,77,.12);
+  border:1px solid var(--line);padding:9px 16px;border-radius:999px}
+.vivo .dot{width:8px;height:8px;border-radius:50%;background:var(--green);animation:parpadeo 1.6s infinite}
+.vivo.off{color:var(--alarm);border-color:rgba(255,68,56,.5);background:rgba(255,68,56,.12)}
+.vivo.off .dot{background:var(--alarm);animation:none}
+@keyframes parpadeo{50%{opacity:.15}}
+.btn{font-family:var(--disp);font-size:12px;font-weight:700;letter-spacing:.14em;
+  text-transform:uppercase;padding:11px 22px;border-radius:999px;border:1px solid var(--line);
+  background:rgba(2,26,21,.8);color:var(--green);transition:.16s}
+.btn:hover:not(:disabled){background:var(--green);color:var(--abyss)}
+.btn.rojo{border-color:rgba(255,68,56,.55);color:#FF9A92}
+.btn.rojo:hover:not(:disabled){background:rgba(255,68,56,.9);color:#fff}
+.btn:disabled{opacity:.45;cursor:default}
+
+h1{font-family:var(--disp);font-size:clamp(1.8rem,3.4vw,2.7rem);font-weight:900;letter-spacing:.02em}
+.kicker{font-family:var(--disp);font-size:12px;letter-spacing:.28em;color:var(--green)}
+
+.hero{padding:30px 0 20px;display:flex;align-items:flex-end;gap:26px;flex-wrap:wrap}
+.kpis{margin-left:auto;display:flex;gap:12px;flex-wrap:wrap}
+.kpi{background:var(--panel);border:1px solid rgba(219,255,240,.14);border-radius:14px;
+  padding:14px 26px;text-align:center;min-width:126px}
+.kpi b{display:block;font-family:var(--disp);font-size:1.9rem;color:var(--green);line-height:1}
+.kpi span{font-size:.62rem;letter-spacing:.16em;color:var(--mint);opacity:.55;font-weight:700}
+
+.podio{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin:14px 0 22px}
+@media(max-width:900px){.podio{grid-template-columns:1fr}}
+.pod{position:relative;overflow:hidden;background:var(--panel);
+  border:1px solid rgba(219,255,240,.14);border-radius:16px;padding:22px 24px}
+.pod::before{content:'';position:absolute;inset:0 0 auto 0;height:4px}
+.pod.p1::before{background:var(--oro)} .pod.p2::before{background:var(--plata)}
+.pod.p3::before{background:var(--bronce)}
+.pod.p1{border-color:rgba(255,201,74,.45);background:rgba(255,201,74,.07)}
+.pod .med{font-size:1.7rem;line-height:1}
+.pod .nom{font-family:var(--disp);font-size:1.15rem;font-weight:700;margin:8px 0 2px;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pod .sub{font-size:.8rem;color:var(--mint);opacity:.6}
+.pod .pts{font-family:var(--disp);font-size:2.5rem;font-weight:900;color:var(--green);
+  line-height:1;margin-top:12px}
+.pod .det{font-size:.82rem;color:var(--mint);opacity:.7;margin-top:6px}
+
+.tabla{background:var(--panel);border:1px solid rgba(219,255,240,.14);
+  border-radius:16px;overflow:hidden}
+.scroll{overflow-x:auto}
+table{width:100%;border-collapse:collapse;min-width:900px}
+th{font-family:var(--disp);font-size:.64rem;letter-spacing:.16em;color:var(--mint);
+  opacity:.6;text-align:left;padding:15px 18px;background:rgba(0,0,0,.28);
+  border-bottom:1px solid rgba(219,255,240,.14)}
+td{padding:15px 18px;border-bottom:1px solid rgba(219,255,240,.08);font-size:1.02rem}
+tr:last-child td{border-bottom:none}
+tbody tr:hover{background:rgba(255,255,255,.03)}
+.pos{font-family:var(--disp);font-weight:900;font-size:1.15rem;color:var(--mint);opacity:.45;width:64px}
+tr.t1 .pos{color:var(--oro);opacity:1} tr.t2 .pos{color:var(--plata);opacity:1}
+tr.t3 .pos{color:var(--bronce);opacity:1}
+.eq{font-weight:700}
+.eq small{display:block;font-weight:400;font-size:.78rem;color:var(--mint);opacity:.55}
+.num{font-family:var(--disp);font-variant-numeric:tabular-nums;white-space:nowrap}
+.total{font-family:var(--disp);font-size:1.3rem;font-weight:900;color:var(--green)}
+.chip{display:inline-flex;align-items:center;padding:5px 13px;border-radius:999px;
+  font-family:var(--disp);font-size:.62rem;letter-spacing:.1em}
+.chip.fin{background:rgba(5,221,77,.16);color:var(--green)}
+.chip.cur{background:rgba(255,194,74,.16);color:var(--amber)}
+.barra{display:flex;gap:5px}
+.barra i{width:22px;height:9px;border-radius:3px;background:rgba(219,255,240,.16)}
+.barra i.on{background:var(--green);box-shadow:0 0 10px rgba(5,221,77,.7)}
+.vacio{padding:70px 24px;text-align:center;color:var(--mint);opacity:.6}
+.vacio .big{font-size:2.6rem;margin-bottom:14px}
+
+details{background:var(--panel);border:1px solid rgba(219,255,240,.14);
+  border-radius:14px;margin:22px 0;overflow:hidden}
+summary{padding:17px 24px;cursor:pointer;font-family:var(--disp);font-size:.82rem;
+  letter-spacing:.12em;color:var(--mint);list-style:none;display:flex;align-items:center;gap:10px}
+summary::-webkit-details-marker{display:none}
+summary::after{content:'▾';margin-left:auto;color:var(--green)}
+details[open] summary::after{transform:rotate(180deg)}
+.cuerpo{padding:0 24px 24px;display:grid;grid-template-columns:1fr 180px auto;gap:14px;align-items:end}
+@media(max-width:760px){.cuerpo{grid-template-columns:1fr}}
+label{display:block;font-family:var(--disp);font-size:.62rem;letter-spacing:.14em;
+  color:var(--mint);opacity:.6;margin-bottom:8px}
+.inp{width:100%;background:rgba(0,0,0,.32);border:1px solid rgba(219,255,240,.2);
+  border-radius:999px;padding:12px 20px;color:var(--mint);outline:none}
+.inp:focus{border-color:var(--green);box-shadow:0 0 22px rgba(5,221,77,.25)}
+.aviso{position:fixed;left:50%;bottom:28px;transform:translateX(-50%) translateY(200%);
+  background:var(--teal);color:#fff;padding:14px 28px;border-radius:999px;font-weight:700;
+  z-index:60;transition:.3s;opacity:0;visibility:hidden;box-shadow:0 12px 40px rgba(0,0,0,.5)}
+.aviso.on{transform:translateX(-50%) translateY(0);opacity:1;visibility:visible}
+.aviso.err{background:var(--alarm)}
+footer{text-align:center;padding:40px 24px;color:var(--mint);opacity:.4;font-size:.78rem}
+footer a{color:var(--green)}
+@media print{header,details,.aviso{display:none}body{background:#fff;color:#111}}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="hd">
+    <div class="logo">
+      <svg viewBox="0 0 1106.5 276.9" role="img" aria-label="Solventum" xmlns="http://www.w3.org/2000/svg"><path d="M89.5 51.3c0-19.3-13.9-31.6-33.6-31.6S21.2 33.9 21.2 54.8s15 35.5 40.1 35.5h42.4c59.8 0 98.7 40.5 98.7 93.3 0 53.2-40.1 93.3-94.9 93.3-55.9 0-94.9-38.6-94.9-91.8 0-19.3 6.6-39.7 16.6-54.8H52c-11.6 15-17.7 33.9-17.7 53.2 0 42 30.5 73.3 73.3 73.3s73.3-31.2 73.3-73.3-30.5-73.3-77.1-73.3h-42C19.7 110.3 0 85.2 0 54.8 0 24.7 25.1 0 55.9 0c33.9 0 54.8 22.8 54.8 49.4 0 3.2-.4 7.5-1.4 10.4h-21c.7-2.3 1.2-6.2 1.2-8.5z" fill="#05dd4d"/><path d="M606.3 144c-1 0-1.6.8-1.6 1.8 1.2 18.6 14.4 32.8 32.6 32.8 14.8 0 23.8-6.2 28.4-16h14.8c-5.6 19.2-22.4 29.4-43.2 29.4-30 0-47.4-21.6-47.4-52.8 0-28.8 20-51.2 47.2-51.2 26.2 0 44.6 18.6 44.6 46 0 3 0 6.2-.4 10h-75zm229.4 31.6h12.4V189h-12.2c-23.4 0-31.2-10.2-31.2-29.4V106c0-1.4-.8-2-2.2-2h-14.6V90.6h14.6c1.4 0 2.2-.6 2.2-2V62h14.8v26.6c0 1.4.6 2 2 2h26.6V104h-26.6c-1.4 0-2 .6-2 2v55.2c0 11.8 2.4 14.4 16.2 14.4zm237.6-87.8c19.8 0 33.2 13.4 33.2 35.6V189h-15v-61.2c0-16.4-7.2-26.2-22.8-26.2-16 0-26 11.6-26 28.4v59h-14.8v-61.2c0-16.4-7.4-26.2-23-26.2-16 0-26 12.4-26 28.4v59h-14.8V90.6h14.2v13.6c0 1.6 1.6 1.8 2.4.6 8-13 17.2-17 29-17 12.4 0 23 6 29.4 18.8.6 1 2.2 1.2 2.8 0 7.2-13 17.8-18.8 31.4-18.8zM895.9 192c-20.2 0-33.8-14.2-33.8-36.4v-65h15v60.8c0 17.4 8.4 27.2 24.2 27.2 17.4 0 28.6-13.2 28.6-29.2V90.6h14.8V189h-14v-15.8c0-1.8-1.8-2.2-2.6-.8-8 14.8-18.6 19.6-32.2 19.6zM746.3 87.8c20.4 0 34 14 34 36.4V189h-15v-60.8c0-17.4-8.4-27.2-24.2-27.2-17.4 0-28.6 13.2-28.6 29.2V189h-15V90.6h14.2v16c0 1.6 1.8 1.8 2.4.6 8.2-14.8 18.8-19.4 32.2-19.4zm-141.2 42.4c0 1.4 1 1.8 2 1.8h57.2c1.4 0 2.2-.6 2.2-2.2-.4-16.8-12.8-28.6-29.4-28.6-16.8 0-29.8 12-32 29zm-62.8 40.4l30-80h15.2L549.3 189h-16.6l-38.2-98.4h15.6l30 80c.2.6.6.8 1 .8.6 0 1-.2 1.2-.8zM467.9 49v140h14.8V49h-14.8zm-64.4 143c-28.2 0-48-22-48.8-52.2s21.2-52 48.8-52c28.4 0 49 21.8 49 52s-21.2 52.2-49 52.2zm0-90.8c-19.8 0-34 15.4-34 38.6s14.2 38.6 34 38.6c20 0 34-15.4 34-38.6s-14-38.6-34-38.6zm-102.2-.6c-15.2 0-23.4 6.4-23.4 15.2 0 8 6.6 11.6 18 13.8l18.6 3.6c21 4 29.4 14.8 29.4 29.4 0 18-15 29.4-39.8 29.4-24 0-41.8-10-42.6-33.2h14.6c2 14.8 13.2 20.4 28.6 20.4 14.2 0 23.8-5.2 23.8-15.6 0-9.2-6.2-14.8-19-17l-18.6-3.2c-19-3.2-27.6-12.8-27.6-26.4 0-17.2 13.6-29.2 38-29.2 21 0 38 9.8 39.2 30.2h-14.4c-1.6-10-10.2-17.4-24.8-17.4z" fill="#DBFFF0"/></svg>
+      <div class="sep"></div>
+      <div class="t">TABLERO<small>Puesto del facilitador</small></div>
+    </div>
+    <div class="der">
+      <div class="vivo" id="vivo"><span class="dot"></span><span id="vivoTx">EN VIVO</span></div>
+      <button class="btn" id="csv">↓ CSV</button>
+      <a class="btn" href="index.html">Abrir consola</a>
+    </div>
+  </div>
+</header>
+
+<div class="wrap">
+  <div class="hero">
+    <div>
+      <div class="kicker" id="sub">Escape Room de Trauma</div>
+      <h1 id="tit" style="margin-top:10px">LA HORA DORADA</h1>
+    </div>
+    <div class="kpis">
+      <div class="kpi"><b id="kEq">0</b><span>EQUIPOS</span></div>
+      <div class="kpi"><b id="kFin">0</b><span>TERMINARON</span></div>
+      <div class="kpi"><b id="kProm">—</b><span>PROMEDIO</span></div>
+      <div class="kpi"><b id="kMax">—</b><span>MEJOR PUNTAJE</span></div>
+    </div>
+  </div>
+
+  <div class="podio" id="podio"></div>
+
+  <div class="tabla">
+    <div class="scroll">
+      <table>
+        <thead><tr>
+          <th>#</th><th>EQUIPO</th><th>ESTADO</th><th>SIGNOS VITALES</th>
+          <th>ACIERTOS</th><th>REINTENTOS</th><th>TIEMPO</th><th>PUNTOS</th>
+        </tr></thead>
+        <tbody id="tb"></tbody>
+      </table>
+    </div>
+    <div class="vacio" id="vacio" hidden>
+      <div class="big">🫀</div>
+      <p>Ningún equipo ha entrado todavía.</p>
+      <p style="font-size:.85rem;opacity:.7;margin-top:6px">El tablero se actualiza solo cada 5 segundos.</p>
+    </div>
+  </div>
+
+  <details>
+    <summary>🔑 PANEL DEL FACILITADOR</summary>
+    <div class="cuerpo">
+      <div>
+        <label for="eq">Equipo a reabrir</label>
+        <input class="inp" id="eq" placeholder="Nombre exacto del equipo" autocomplete="off">
+      </div>
+      <div>
+        <label for="pin">PIN</label>
+        <input class="inp" id="pin" type="password" inputmode="numeric" placeholder="••••" autocomplete="off">
+      </div>
+      <button class="btn rojo" id="reabrir">Reabrir</button>
+      <p style="grid-column:1/-1;font-size:.84rem;opacity:.6;margin-top:4px">
+        Borra la partida del equipo para que empiece de cero. Úsalo solo ante una falla técnica.</p>
+    </div>
+  </details>
+</div>
+
+<footer>
+  Tablero del facilitador · <a href="index.html">Consola de los equipos</a>
+</footer>
+
+<div class="aviso" id="aviso"></div>
+
+<script>
+'use strict';
+const SB_URL='https://nvgkhdrrxqdgxktfkioa.supabase.co';
+const SB_KEY='sb_publishable_d1RrtE7S-9a8e8mGKRRjxQ_4HU_nkDl';
+const REFRESCO=5000;
+
+const $ = id => document.getElementById(id);
+const esc = s => String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const mmss = s => { s=Math.max(0,Math.floor(s||0));
+  return String(Math.floor(s/60)).padStart(2,'0')+':'+String(s%60).padStart(2,'0'); };
+
+async function rpc(fn,args){
+  const r = await fetch(SB_URL+'/rest/v1/rpc/'+fn,{method:'POST',
+    headers:{apikey:SB_KEY,Authorization:'Bearer '+SB_KEY,'Content-Type':'application/json'},
+    body:JSON.stringify(args||{})});
+  const t = await r.text(); let d=null;
+  try{ d = t?JSON.parse(t):null; }catch(e){ d=t; }
+  if(!r.ok) throw new Error((d&&(d.message||d.details))||('HTTP '+r.status));
+  return d;
+}
+let avisoT;
+function aviso(m,err){ const a=$('aviso'); a.textContent=m; a.classList.toggle('err',!!err);
+  a.classList.add('on'); clearTimeout(avisoT); avisoT=setTimeout(()=>a.classList.remove('on'),5000); }
+
+let ultimo=[], totalEstaciones=4;
+
+async function cargar(){
+  try{
+    const [cfg, rank] = await Promise.all([rpc('evoforma2_config',{}), rpc('evoforma2_ranking',{})]);
+    if(cfg && cfg.juego){
+      $('tit').textContent = cfg.juego.titulo;
+      $('sub').textContent = cfg.juego.subtitulo;
+      totalEstaciones = (cfg.estaciones||[]).length || 4;
+      document.title = 'Tablero · ' + cfg.juego.titulo + ' | Solventum';
+    }
+    ultimo = rank || [];
+    pintar(ultimo);
+    $('vivoTx').textContent='EN VIVO'; $('vivo').classList.remove('off');
+  }catch(e){
+    $('vivoTx').textContent='SIN CONEXIÓN'; $('vivo').classList.add('off');
+  }
+}
+
+function pintar(f){
+  const fin = f.filter(x=>x.estado==='finalizada');
+  $('kEq').textContent  = f.length;
+  $('kFin').textContent = fin.length;
+  $('kProm').textContent = f.length ? Math.round(f.reduce((a,x)=>a+x.puntos,0)/f.length) : '—';
+  $('kMax').textContent  = f.length ? Math.max(...f.map(x=>x.puntos)) : '—';
+
+  const med=['🥇','🥈','🥉'];
+  $('podio').innerHTML = f.slice(0,3).map((x,i)=>`
+    <div class="pod p${i+1}">
+      <div class="med">${med[i]}</div>
+      <div class="nom" title="${esc(x.equipo)}">${esc(x.equipo)}</div>
+      <div class="sub">${esc(x.jornada||'—')}</div>
+      <div class="pts">${x.puntos}</div>
+      <div class="det">${x.estaciones}/${totalEstaciones} signos vitales · ⏱ ${mmss(x.duracion_seg)}</div>
+    </div>`).join('');
+
+  $('vacio').hidden = f.length>0;
+  $('tb').innerHTML = f.map((x,i)=>{
+    const barra = Array.from({length:totalEstaciones},(_,k)=>
+      `<i class="${k < x.estaciones ? 'on':''}"></i>`).join('');
+    return `<tr class="${i<3?'t'+(i+1):''}">
+      <td class="pos">${i+1}</td>
+      <td class="eq">${esc(x.equipo)}${x.jornada?`<small>${esc(x.jornada)}</small>`:''}</td>
+      <td>${x.estado==='finalizada'
+            ? '<span class="chip fin">TERMINÓ</span>'
+            : '<span class="chip cur">EN JUEGO</span>'}</td>
+      <td><div class="barra">${barra}</div></td>
+      <td class="num">${x.aciertos}</td>
+      <td class="num">${x.intentos}</td>
+      <td class="num">${mmss(x.duracion_seg)}</td>
+      <td class="total">${x.puntos}</td>
+    </tr>`;
+  }).join('');
+}
+
+$('csv').addEventListener('click',()=>{
+  if(!ultimo.length) return aviso('No hay datos para exportar.',true);
+  const q = v => '"'+String(v??'').replace(/"/g,'""')+'"';
+  const cab = ['Posicion','Equipo','Jornada','Estado','Signos vitales','Aciertos',
+               'Reintentos','Duracion (mm:ss)','Duracion (seg)','Puntos'];
+  const filas = ultimo.map((x,i)=>[i+1,x.equipo,x.jornada,x.estado,
+    x.estaciones+'/'+totalEstaciones,x.aciertos,x.intentos,
+    mmss(x.duracion_seg),x.duracion_seg,x.puntos].map(q).join(';'));
+  const csv = '﻿'+[cab.map(q).join(';'),...filas].join('\r\n');
+  const url = URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));
+  Object.assign(document.createElement('a'),{href:url,download:'la-hora-dorada-tablero.csv'}).click();
+  URL.revokeObjectURL(url);
+  aviso('Resultados exportados.');
+});
+
+$('reabrir').addEventListener('click', async ()=>{
+  const eq=$('eq').value.trim(), pin=$('pin').value.trim();
+  if(!eq||!pin) return aviso('Indica el equipo y el PIN.',true);
+  if(!confirm(`Se borrará la partida de «${eq}». ¿Continuar?`)) return;
+  const b=$('reabrir'); b.disabled=true; b.textContent='…';
+  try{
+    const r = await rpc('evoforma2_reabrir',{p_equipo:eq,p_pin:pin});
+    aviso(r.reiniciadas ? `Partida de «${eq}» reabierta.` : `No hay partida de «${eq}».`, !r.reiniciadas);
+    $('eq').value=''; cargar();
+  }catch(e){ aviso(e.message,true); }
+  finally{ b.disabled=false; b.textContent='Reabrir'; }
+});
+
+cargar();
+setInterval(cargar, REFRESCO);
+document.addEventListener('visibilitychange',()=>{ if(!document.hidden) cargar(); });
+</script>
+</body>
+</html>
