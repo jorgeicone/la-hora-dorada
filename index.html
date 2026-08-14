@@ -1,22 +1,19 @@
 <!DOCTYPE html>
 <!--
   ============================================================================
-  LA HORA DORADA — Escape Room de Trauma · Prototipo v2
+  LA HORA DORADA — Escape Room de Trauma
   Cliente: Solventum · © 2026 Jorge Hugo Pérez Gaona
 
-  NO EDITAR index.html A MANO. Fuente:
-      index.template.html + contenido-solventum.json  →  index.html
-      python construir.py
+  VERSIÓN DE PRODUCCIÓN. A diferencia del prototipo, este archivo NO contiene
+  el contenido ni las respuestas: los pide al servidor al arrancar y le manda
+  cada respuesta para que la corrija allá.
 
-  Estructura tomada del prototipo de referencia (Genially): lienzo 16:9 fijo,
-  fondo ilustrado a sangre por pantalla, paneles translúcidos encima, reloj por
-  pregunta, alarma roja, contador de coleccionables y candado de código.
-  Añadido aquí: luz en tiempo real (núcleo latiendo, barridos, destellos) y
-  sonido sintetizado con Web Audio — sin un solo archivo de audio.
+  Abrir DevTools aquí no sirve de nada: evoforma2_config entrega los enunciados
+  y las opciones ya despojados de 'correcta', 'respuesta' y 'clave', y los ítems
+  de ordenar llegan barajados y sin su posición correcta. El servidor tampoco
+  revela cuál era la buena cuando se falla, para que REPETIR siga siendo un reto.
 
-  ⚠ PROTOTIPO: las respuestas viajan dentro de este HTML. Sirve para revisar
-  mecánica y contenido, no para un evento real. Toda la corrección está aislada
-  en evaluar(), que es el único punto a mover al servidor.
+  Backend: esquema evoforma2 en Supabase. La v1 (evoforma) no se toca.
   ============================================================================
 -->
 <html lang="es">
@@ -24,6 +21,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#02120E">
+<meta name="author" content="Jorge Hugo Pérez Gaona">
 <meta name="robots" content="noindex, nofollow">
 <title>La Hora Dorada · Escape Room de Trauma | Solventum</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -32,11 +30,9 @@
 <style>
 :root{
   --green:#05DD4D; --green-soft:#3BFF7E; --deep:#01332B; --abyss:#02120E;
-  --mint:#DBFFF0; --teal:#0A7B6B;
-  --alarm:#FF4438; --amber:#FFC24A;
+  --mint:#DBFFF0; --teal:#0A7B6B; --alarm:#FF4438; --amber:#FFC24A;
   --panel:rgba(2,26,21,.74); --line:rgba(5,221,77,.42);
-  --disp:'Orbitron',system-ui,sans-serif;
-  --body:'Inter',system-ui,-apple-system,sans-serif;
+  --disp:'Orbitron',system-ui,sans-serif; --body:'Inter',system-ui,sans-serif;
 }
 *{box-sizing:border-box;margin:0;padding:0}
 html,body{height:100%;overflow:hidden;background:#000;color:var(--mint);
@@ -46,16 +42,12 @@ button{cursor:pointer;border:none;background:none}
 :focus-visible{outline:2px solid var(--green);outline-offset:2px}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 
-/* ---------- Lienzo 16:9 fijo ---------- */
 #viewport{position:fixed;inset:0;display:grid;place-items:center;background:#000}
 #stage{width:1280px;height:720px;position:relative;overflow:hidden;
-  transform-origin:center center;background:var(--abyss);
-  box-shadow:0 0 90px rgba(5,221,77,.13)}
-.screen{position:absolute;inset:0;display:none;flex-direction:column}
-.screen.on{display:flex;animation:fadein .35s ease both}
+  transform-origin:center center;background:var(--abyss);box-shadow:0 0 90px rgba(5,221,77,.13)}
+.screen{position:absolute;inset:0;display:flex;flex-direction:column;animation:fadein .35s ease both}
 @keyframes fadein{from{opacity:0}to{opacity:1}}
 
-/* ---------- Capas de fondo ---------- */
 .bg{position:absolute;inset:0;background-size:cover;background-position:center;
   animation:drift 26s ease-in-out infinite alternate}
 @keyframes drift{from{transform:scale(1.02)}to{transform:scale(1.09)}}
@@ -65,64 +57,51 @@ button{cursor:pointer;border:none;background:none}
   background-image:repeating-linear-gradient(0deg,rgba(255,255,255,.05) 0 1px,transparent 1px 3px)}
 .layer{position:relative;z-index:3;flex:1;display:flex;flex-direction:column}
 
-/* ---------- Tipografía ---------- */
-.disp{font-family:var(--disp);letter-spacing:.08em}
 h1{font-family:var(--disp);font-size:52px;font-weight:900;letter-spacing:.03em;line-height:1.05}
 h2{font-family:var(--disp);font-size:30px;font-weight:700;letter-spacing:.06em}
 .kicker{font-family:var(--disp);font-size:15px;font-weight:500;letter-spacing:.34em;
   color:var(--green);text-shadow:0 0 18px rgba(5,221,77,.7)}
 
-/* ---------- Botones ---------- */
 .btn{font-family:var(--disp);font-size:16px;font-weight:700;letter-spacing:.14em;
-  text-transform:uppercase;padding:15px 34px;border-radius:999px;
-  border:1px solid var(--line);background:rgba(2,26,21,.8);color:var(--green);
-  transition:.16s;display:inline-flex;align-items:center;gap:12px}
-.btn:hover{background:var(--green);color:var(--abyss);box-shadow:0 0 30px rgba(5,221,77,.6)}
+  text-transform:uppercase;padding:15px 34px;border-radius:999px;border:1px solid var(--line);
+  background:rgba(2,26,21,.8);color:var(--green);transition:.16s;
+  display:inline-flex;align-items:center;gap:12px}
+.btn:hover:not(:disabled){background:var(--green);color:var(--abyss);box-shadow:0 0 30px rgba(5,221,77,.6)}
 .btn.solid{background:var(--green);color:var(--abyss);border-color:var(--green)}
-.btn.solid:hover{background:var(--green-soft);box-shadow:0 0 40px rgba(5,221,77,.8)}
+.btn.solid:hover:not(:disabled){background:var(--green-soft);box-shadow:0 0 40px rgba(5,221,77,.8)}
 .btn.ghost{color:var(--mint);border-color:rgba(219,255,240,.4)}
 .btn.ghost:hover{background:rgba(219,255,240,.14);color:var(--mint);box-shadow:none}
-.btn:disabled{opacity:.4;cursor:default;filter:none}
+.btn:disabled{opacity:.45;cursor:default;filter:none}
 .ico{width:46px;height:46px;border-radius:50%;display:grid;place-items:center;
-  border:1px solid var(--line);background:rgba(2,26,21,.8);color:var(--green);
-  font-size:18px;transition:.16s}
+  border:1px solid var(--line);background:rgba(2,26,21,.8);color:var(--green);font-size:18px;transition:.16s}
 .ico:hover{background:var(--green);color:var(--abyss)}
 
-/* ---------- Barra superior ---------- */
 .top{position:absolute;top:20px;left:20px;right:20px;z-index:8;
   display:flex;justify-content:space-between;align-items:flex-start;pointer-events:none}
 .top>*{pointer-events:auto}
 .tl,.tr{display:flex;gap:10px;align-items:center}
-.timer{font-family:var(--disp);font-size:26px;font-weight:700;letter-spacing:.1em;
-  color:var(--green);border:1px solid var(--line);background:rgba(2,26,21,.85);
-  padding:10px 22px;border-radius:999px;min-width:120px;text-align:center}
+.timer{font-family:var(--disp);font-size:26px;font-weight:700;letter-spacing:.1em;color:var(--green);
+  border:1px solid var(--line);background:rgba(2,26,21,.85);padding:10px 22px;
+  border-radius:999px;min-width:120px;text-align:center}
 .timer.warn{color:var(--amber);border-color:var(--amber)}
 .timer.crit{color:var(--alarm);border-color:var(--alarm);animation:pulse .55s infinite}
 @keyframes pulse{50%{opacity:.4}}
-.score{font-family:var(--disp);font-size:14px;font-weight:500;letter-spacing:.12em;
-  color:var(--mint);border:1px solid rgba(219,255,240,.28);background:rgba(2,26,21,.7);
-  padding:11px 18px;border-radius:999px}
+.score{font-family:var(--disp);font-size:14px;letter-spacing:.12em;color:var(--mint);
+  border:1px solid rgba(219,255,240,.28);background:rgba(2,26,21,.7);padding:11px 18px;border-radius:999px}
 
-/* ---------- Contador de signos vitales ---------- */
-.vitals{position:absolute;right:20px;top:96px;z-index:8;
-  display:flex;flex-direction:column;gap:10px}
+.vitals{position:absolute;right:20px;top:96px;z-index:8;display:flex;flex-direction:column;gap:10px}
 .vital{width:58px;height:58px;border-radius:14px;display:grid;place-items:center;
   border:1px solid rgba(219,255,240,.22);background:rgba(2,26,21,.7);transition:.3s}
 .vital svg{width:36px;height:22px}
-.vital polyline{fill:none;stroke:rgba(219,255,240,.28);stroke-width:2;
-  stroke-linecap:round;stroke-linejoin:round}
+.vital polyline{fill:none;stroke:rgba(219,255,240,.28);stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 .vital.got{border-color:var(--green);box-shadow:0 0 26px rgba(5,221,77,.55)}
-.vital.got polyline{stroke:var(--green);filter:drop-shadow(0 0 5px var(--green));
-  animation:beat 1.5s ease-in-out infinite}
+.vital.got polyline{stroke:var(--green);filter:drop-shadow(0 0 5px var(--green));animation:beat 1.5s ease-in-out infinite}
 @keyframes beat{0%,100%{opacity:.65}50%{opacity:1}}
 
-/* ---------- Portada ---------- */
 .center{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:26px}
-.titlebox{background:var(--panel);border:1px solid var(--line);padding:32px 74px;
-  text-align:center;backdrop-filter:blur(3px);border-radius:6px;
+.titlebox{background:var(--panel);border:1px solid var(--line);padding:32px 74px;text-align:center;
+  backdrop-filter:blur(3px);border-radius:6px;
   box-shadow:0 0 60px rgba(5,221,77,.16),inset 0 0 40px rgba(0,0,0,.35)}
-
-/* ---------- Paneles de texto ---------- */
 .wrap{flex:1;display:grid;place-items:center;padding:92px 110px 34px}
 .panel{width:100%;max-width:900px;background:var(--panel);border:1px solid var(--line);
   border-radius:8px;padding:34px 40px;backdrop-filter:blur(3px);
@@ -130,9 +109,12 @@ h2{font-family:var(--disp);font-size:30px;font-weight:700;letter-spacing:.06em}
 .narr{font-size:19px;line-height:1.6;text-align:center;color:var(--mint)}
 .floatbtn{position:absolute;bottom:34px;right:34px;z-index:8}
 
-/* ---------- Mapa ---------- */
-.node{position:absolute;width:150px;transform:translate(-50%,-50%);z-index:6;
-  text-align:center;transition:.2s}
+.inp{width:100%;background:rgba(1,20,16,.75);border:1px solid var(--line);border-radius:999px;
+  padding:14px 24px;font-size:17px;color:var(--mint);outline:none;text-align:center}
+.inp:focus{box-shadow:0 0 26px rgba(5,221,77,.35)}
+.inp::placeholder{color:rgba(219,255,240,.32)}
+
+.node{position:absolute;width:150px;transform:translate(-50%,-50%);z-index:6;text-align:center;transition:.2s}
 .node .ring{width:66px;height:66px;margin:0 auto;border-radius:50%;
   border:2px solid rgba(219,255,240,.25);display:grid;place-items:center;
   font-family:var(--disp);font-size:20px;font-weight:700;color:rgba(219,255,240,.35);
@@ -140,20 +122,17 @@ h2{font-family:var(--disp);font-size:30px;font-weight:700;letter-spacing:.06em}
 .node .lbl{margin-top:8px;font-family:var(--disp);font-size:11px;letter-spacing:.12em;
   color:rgba(219,255,240,.45);text-transform:uppercase}
 .node.locked{filter:grayscale(.7)}
-.node.done .ring{border-color:var(--green);color:var(--green);
-  box-shadow:0 0 30px rgba(5,221,77,.6)}
+.node.done .ring{border-color:var(--green);color:var(--green);box-shadow:0 0 30px rgba(5,221,77,.6)}
 .node.done .lbl{color:var(--green)}
 .node.avail{cursor:pointer}
-.node.avail .ring{border-color:var(--green-soft);color:var(--green-soft);
-  animation:halo 1.7s ease-in-out infinite}
+.node.avail .ring{border-color:var(--green-soft);color:var(--green-soft);animation:halo 1.7s ease-in-out infinite}
 .node.avail .lbl{color:var(--mint)}
 .node.avail:hover{transform:translate(-50%,-50%) scale(1.08)}
-@keyframes halo{
-  0%,100%{box-shadow:0 0 18px rgba(5,221,77,.45)}
+@keyframes halo{0%,100%{box-shadow:0 0 18px rgba(5,221,77,.45)}
   50%{box-shadow:0 0 46px rgba(5,221,77,.95),0 0 90px rgba(5,221,77,.35)}}
 .node .card{position:absolute;left:50%;transform:translateX(-50%);top:104px;width:250px;
-  background:rgba(2,26,21,.94);border:1px solid var(--line);border-radius:6px;
-  padding:11px 13px;opacity:0;pointer-events:none;transition:.2s;z-index:9}
+  background:rgba(2,26,21,.94);border:1px solid var(--line);border-radius:6px;padding:11px 13px;
+  opacity:0;pointer-events:none;transition:.2s;z-index:9}
 .node.avail:hover .card{opacity:1}
 .node .card b{display:block;font-family:var(--disp);font-size:12px;color:var(--green);
   letter-spacing:.08em;margin-bottom:4px}
@@ -168,33 +147,29 @@ h2{font-family:var(--disp);font-size:30px;font-weight:700;letter-spacing:.06em}
 .maphint{position:absolute;bottom:26px;left:0;right:0;text-align:center;z-index:7;
   font-family:var(--disp);font-size:11px;letter-spacing:.22em;color:rgba(219,255,240,.5)}
 
-/* ---------- Retos ---------- */
 .qnum{font-family:var(--disp);font-size:30px;font-weight:900;color:var(--green);
   letter-spacing:.16em;margin-bottom:10px}
 .qtext{font-size:21px;font-weight:600;line-height:1.4;margin-bottom:22px}
-.opt{display:flex;align-items:center;gap:14px;width:100%;text-align:left;
-  padding:14px 18px;margin-bottom:10px;border-radius:6px;
-  background:rgba(1,20,16,.62);border:1px solid rgba(219,255,240,.2);
-  color:var(--mint);font-size:17px;transition:.15s}
-.opt:hover{border-color:var(--green);background:rgba(5,221,77,.12)}
-.opt .box{width:26px;height:26px;border-radius:50%;border:1px solid var(--green);
-  flex:none;display:grid;place-items:center;font-family:var(--disp);
-  font-size:12px;color:var(--green)}
+.opt{display:flex;align-items:center;gap:14px;width:100%;text-align:left;padding:14px 18px;
+  margin-bottom:10px;border-radius:6px;background:rgba(1,20,16,.62);
+  border:1px solid rgba(219,255,240,.2);color:var(--mint);font-size:17px;transition:.15s}
+.opt:hover:not(:disabled){border-color:var(--green);background:rgba(5,221,77,.12)}
+.opt .box{width:26px;height:26px;border-radius:50%;border:1px solid var(--green);flex:none;
+  display:grid;place-items:center;font-family:var(--disp);font-size:12px;color:var(--green)}
 .opt.sel{border-color:var(--green);background:rgba(5,221,77,.2);color:#fff}
 .opt.sel .box{background:var(--green);color:var(--abyss)}
-.opt.ok{border-color:var(--green);background:rgba(5,221,77,.24)}
-.opt.bad{border-color:var(--alarm);background:rgba(255,68,56,.2)}
+.opt.ok{border-color:var(--green);background:rgba(5,221,77,.28)}
+.opt.bad{border-color:var(--alarm);background:rgba(255,68,56,.22)}
 .opt:disabled{cursor:default}
 .tf{display:flex;gap:16px}
-.tf .opt{flex:1;justify-content:center;font-family:var(--disp);
-  font-size:19px;letter-spacing:.1em}
+.tf .opt{flex:1;justify-content:center;font-family:var(--disp);font-size:19px;letter-spacing:.1em}
 .srow{display:flex;align-items:center;gap:11px;margin-bottom:10px}
 .srow .idx{width:38px;height:38px;flex:none;border-radius:6px;display:grid;place-items:center;
   border:1px solid var(--line);color:var(--green);font-family:var(--disp);font-size:15px}
 .srow .body{flex:1;padding:13px 17px;border-radius:6px;font-size:17px;
   background:rgba(1,20,16,.62);border:1px solid rgba(219,255,240,.2)}
-.srow.ok .body{border-color:var(--green);background:rgba(5,221,77,.22)}
-.srow.bad .body{border-color:var(--alarm);background:rgba(255,68,56,.18)}
+.srow.ok .body{border-color:var(--green);background:rgba(5,221,77,.26)}
+.srow.bad .body{border-color:var(--alarm);background:rgba(255,68,56,.2)}
 .arrows{display:flex;flex-direction:column;gap:3px}
 .arrows button{width:34px;height:24px;border-radius:4px;border:1px solid var(--line);
   color:var(--green);font-size:11px;line-height:1;background:rgba(2,26,21,.8)}
@@ -202,26 +177,21 @@ h2{font-family:var(--disp);font-size:30px;font-weight:700;letter-spacing:.06em}
 .arrows button:disabled{opacity:.22;cursor:default}
 .qfoot{display:flex;justify-content:flex-end;margin-top:16px}
 
-/* ---------- Candado ---------- */
-.lockin{font-family:var(--disp);font-size:34px;font-weight:700;text-align:center;
-  letter-spacing:.42em;padding:16px 20px;width:100%;color:var(--green);
-  background:rgba(1,20,16,.75);border:1px solid var(--line);border-radius:999px;outline:none}
+.lockin{font-family:var(--disp);font-size:34px;font-weight:700;text-align:center;letter-spacing:.42em;
+  padding:16px 20px;width:100%;color:var(--green);background:rgba(1,20,16,.75);
+  border:1px solid var(--line);border-radius:999px;outline:none}
 .lockin:focus{box-shadow:0 0 32px rgba(5,221,77,.45)}
 .lockerr{height:22px;margin-top:12px;color:#FF9A92;font-size:14px}
 
-/* ---------- Resultados ---------- */
 .kpis{display:flex;gap:14px;margin:18px 0}
-.kpi{flex:1;border:1px solid var(--line);border-radius:6px;padding:14px;text-align:center;
-  background:rgba(1,20,16,.5)}
+.kpi{flex:1;border:1px solid var(--line);border-radius:6px;padding:14px;text-align:center;background:rgba(1,20,16,.5)}
 .kpi b{display:block;font-family:var(--disp);font-size:26px;color:var(--green)}
 .kpi span{font-size:10px;letter-spacing:.16em;color:rgba(219,255,240,.6)}
 table{width:100%;border-collapse:collapse;font-size:15px}
 th,td{padding:9px 11px;text-align:left;border-bottom:1px solid rgba(5,221,77,.18)}
 th{font-family:var(--disp);font-size:10px;letter-spacing:.14em;color:rgba(219,255,240,.6)}
 
-/* ---------- Overlays y luz ---------- */
-.ov{position:absolute;inset:0;z-index:30;display:none;place-items:center}
-.ov.on{display:grid}
+.ov{position:absolute;inset:0;z-index:30;display:grid;place-items:center}
 .ov .mask{position:absolute;inset:0;background:rgba(1,10,8,.86)}
 .ovbox{position:relative;background:linear-gradient(180deg,rgba(3,44,35,.97),rgba(1,22,18,.97));
   border:1px solid var(--line);border-radius:8px;padding:40px 52px;text-align:center;max-width:760px}
@@ -243,10 +213,12 @@ th{font-family:var(--disp);font-size:10px;letter-spacing:.14em;color:rgba(219,25
   background:linear-gradient(90deg,transparent,rgba(5,221,77,.35),transparent);
   animation:sweep 1s ease-out forwards}
 @keyframes sweep{from{left:-35%}to{left:105%}}
-.hint{position:absolute;bottom:8px;left:12px;z-index:40;font-size:10px;
-  letter-spacing:.1em;color:rgba(219,255,240,.3)}
+.hint{position:absolute;bottom:8px;left:12px;z-index:40;font-size:10px;letter-spacing:.1em;color:rgba(219,255,240,.3)}
 .brand{position:absolute;bottom:14px;right:16px;z-index:40;opacity:.5}
 .brand svg{height:16px;width:auto;display:block}
+.spin{width:38px;height:38px;border:3px solid rgba(5,221,77,.2);border-top-color:var(--green);
+  border-radius:50%;animation:spin .8s linear infinite;margin:0 auto}
+@keyframes spin{to{transform:rotate(360deg)}}
 </style>
 </head>
 <body>
@@ -254,488 +226,40 @@ th{font-family:var(--disp);font-size:10px;letter-spacing:.14em;color:rgba(219,25
 
 <script>
 'use strict';
+
 /* =========================================================================
-   CONTENIDO — inyectado desde contenido-solventum.json por construir.py
+   SERVIDOR — el contenido y la corrección viven allá, no aquí.
    ========================================================================= */
-const GAME = {
-  "juego": {
-    "titulo": "LA HORA DORADA",
-    "subtitulo": "Escape Room de Trauma",
-    "botonInicio": "INICIAR MISIÓN",
-    "coleccionable": {
-      "nombre": "Signo Vital",
-      "plural": "Signos Vitales",
-      "cantidad": 4,
-      "_porQue": "Cada estación superada recupera un signo vital del paciente, así el marcador de progreso ES el monitor: el avance del equipo y la mejoría del caso son la misma imagen."
-    },
-    "intro": "Son las 02:14. Entra a la sala de reanimación un hombre de 38 años tras una colisión lateral de alta energía. Está confuso, frío y su presión no responde. Ustedes son la tripulación de cronocirujanos y disponen de la hora dorada: ese margen en el que lo que hagan todavía decide el desenlace. Cada estación que superen devuelve un signo vital. Pierdan el ritmo y lo perderán a él. El reloj ya corre.",
-    "cierre": "El paciente está estabilizado y en camino a la reparación definitiva. Han recuperado los cuatro signos vitales dentro de la hora dorada.",
-    "agradecimiento": "MISIÓN CUMPLIDA, CRONOCIRUJANOS",
-    "hub": {
-      "titulo": "MONITOR DE SIGNOS VITALES",
-      "instruccion": "Selecciona la estación desbloqueada para continuar",
-      "imagenMapa": "imagenes/mapa.png"
-    },
-    "imagenPortada": "imagenes/portada.png"
-  },
-  "config": {
-    "validacion": "servidor",
-    "envioUnicoPorEstacion": true,
-    "mostrarPuntuacion": true,
-    "permitirCambiarRespuestaAntesDeEnviar": true,
-    "_nota": "El equipo responde todo y valida una sola vez al cerrar la estación, como en la v1. Sin reintentos no hay fuerza bruta posible sobre las opciones.",
-    "escalaPuntos": 25,
-    "bonusPorSegundoRestante": 2,
-    "penalizacionPorReintento": 25,
-    "permitirSalirDesdeAlarma": true,
-    "_notaModelo": "El reloj corre por pregunta, no por estacion: es lo que genera la tension del escape room. El limite de 12 min por estacion sigue vivo en la consola v1, que es la que puntua oficialmente."
-  },
-  "textos": {
-    "siguiente": "SIGUIENTE",
-    "enviar": "ENVIAR",
-    "enviado": "ENVIADO",
-    "volverAlMapa": "VOLVER AL MONITOR",
-    "salirTitulo": "¿SALIR DE LA ESTACIÓN?",
-    "salirTexto": "El cronómetro sigue corriendo aunque salgan de esta pantalla.",
-    "salirConfirmar": "SALIR",
-    "salirCancelar": "SEGUIR TRABAJANDO",
-    "resultadosTitulo": "INFORME DE MISIÓN",
-    "finalizar": "FINALIZAR",
-    "alarmaTitulo": "CÓDIGO ROJO",
-    "alarmaTexto": "El paciente se descompensa y las constantes caen. Vuelvan a intentarlo antes de perderlo."
-  },
-  "bonosTiempo": [
-    {
-      "hasta_seg": 300,
-      "puntos": 6,
-      "etiqueta": "Menos de 5:00 min"
-    },
-    {
-      "hasta_seg": 480,
-      "puntos": 5,
-      "etiqueta": "Entre 5:01 y 8:00 min"
-    },
-    {
-      "hasta_seg": 660,
-      "puntos": 4,
-      "etiqueta": "Entre 8:01 y 11:00 min"
-    },
-    {
-      "hasta_seg": 720,
-      "puntos": 3,
-      "etiqueta": "Entre 11:01 y 12:00 min"
-    }
-  ],
-  "estaciones": [
-    {
-      "id": "E1",
-      "orden": 1,
-      "nombre": "El Umbral del Trauma",
-      "signoVital": "Vía aérea",
-      "revisionClinica": "VALIDADA",
-      "descripcionMapa": "La sala de reanimación. Aquí se decide si el paciente entra a quirófano.",
-      "briefing": "Masculino de 38 años, copiloto en colisión lateral de alta energía. Llega inmovilizado con tabla rígida y collar cervical, canalizado con 2 yelcos #14 y con 2 L de cristaloides ya pasados. Está confuso (Glasgow 14/15) y tiene marca de cinturón con equimosis en flanco e hipocondrio derecho. Sobre la mesa hay 10 fichas de acciones clínicas: identifiquen las 4 prioritarias del ABCDE y ordénenlas antes de pedirle al facilitador el Sobre de Exámenes.",
-      "mensajeExito": "Vía aérea asegurada y hemoperitoneo confirmado. El paciente va a quirófano. Regresen al monitor.",
-      "tiempoMaxSeg": 720,
-      "tipoReto": "SINGLE",
-      "fondo": "imagenes/e1.png",
-      "preguntas": [
-        {
-          "codigo": "1.1",
-          "tipoReto": "SINGLE",
-          "puntos": 4,
-          "enunciado": "Tras analizar el Sobre de Exámenes Clínicos y confirmar el shock refractario, ¿cuál es el hallazgo ecográfico que confirma el hemoperitoneo y justifica la laparotomía de urgencia?",
-          "opciones": [
-            {
-              "texto": "FAST− — sin líquido libre; se descarta sangrado intraabdominal",
-              "correcta": false
-            },
-            {
-              "texto": "eFAST con neumotórax a tensión derecho",
-              "correcta": false
-            },
-            {
-              "texto": "FAST+ — líquido libre en cavidad abdominal",
-              "correcta": true
-            },
-            {
-              "texto": "Ecografía no concluyente por interposición de gas intestinal",
-              "correcta": false
-            }
-          ]
-        },
-        {
-          "codigo": "1.2",
-          "tipoReto": "SINGLE",
-          "puntos": 4,
-          "enunciado": "Para abrir la caja de seguridad y validar el hallazgo de la Tríada Letal, ¿cuál es la combinación de 3 dígitos derivada de la temperatura corporal crítica del paciente?",
-          "opciones": [
-            {
-              "texto": "350 — hipotermia de 35.0 °C",
-              "correcta": false
-            },
-            {
-              "texto": "348 — hipotermia de 34.8 °C",
-              "correcta": true
-            },
-            {
-              "texto": "340 — hipotermia de 34.0 °C",
-              "correcta": false
-            },
-            {
-              "texto": "362 — temperatura de 36.2 °C",
-              "correcta": false
-            }
-          ]
-        },
-        {
-          "codigo": "1.3",
-          "tipoReto": "SINGLE",
-          "puntos": 4,
-          "enunciado": "Tras clasificar las 4 conductas quirúrgicas correctas de Control de Daños, ¿cuál es el valor resultante de la suma de sus fichas, equivalente al volumen crítico en decilitros del hemoperitoneo evacuado?",
-          "opciones": [
-            {
-              "texto": "22 decilitros",
-              "correcta": false
-            },
-            {
-              "texto": "30 decilitros",
-              "correcta": false
-            },
-            {
-              "texto": "28 decilitros",
-              "correcta": false
-            },
-            {
-              "texto": "25 decilitros",
-              "correcta": true
-            }
-          ]
-        }
-      ],
-      "candadoDespues": {
-        "codigo": "1.4",
-        "tipoReto": "CODE",
-        "puntos": 2,
-        "titulo": "Clave Combinada de Salida",
-        "enunciado": "Para desacoplar el Umbral del Trauma, ¿cuál es la clave maestra que combina el candado de la Tríada con la suma de Conducta CCD?",
-        "tiempoPorPregunta": null,
-        "pista": "Candado de la Tríada combinado con la suma de Conducta CCD.",
-        "placeholder": "· · · ·",
-        "boton": "DESBLOQUEAR",
-        "clave": "348-25"
-      },
-      "tiempoPorPregunta": 35
-    },
-    {
-      "id": "E2",
-      "orden": 2,
-      "nombre": "La Tríada Letal",
-      "signoVital": "Temperatura",
-      "revisionClinica": "PENDIENTE",
-      "descripcionMapa": "Hipotermia, acidosis y coagulopatía. El círculo que mata más que la herida.",
-      "briefing": "El paciente sigue frío y sangrando. Ya no basta con reponer volumen: cada litro de cristaloide que entra diluye los factores de coagulación y baja aún más la temperatura. Reconozcan el círculo vicioso y elijan una reanimación que no lo alimente. La clave de salida es la proporción que van a transfundir.",
-      "mensajeExito": "Han roto el círculo. Temperatura recuperada. Regresen al monitor.",
-      "tiempoMaxSeg": 720,
-      "tipoReto": "MULTI",
-      "fondo": "imagenes/e2.png",
-      "preguntas": [
-        {
-          "codigo": "2.1",
-          "tipoReto": "MULTI",
-          "puntos": 4,
-          "enunciado": "Seleccionen los tres componentes de la tríada letal del trauma.",
-          "opciones": [
-            {
-              "texto": "Hipotermia",
-              "correcta": true
-            },
-            {
-              "texto": "Acidosis metabólica",
-              "correcta": true
-            },
-            {
-              "texto": "Coagulopatía",
-              "correcta": true
-            },
-            {
-              "texto": "Hiperglucemia de estrés",
-              "correcta": false
-            }
-          ]
-        },
-        {
-          "codigo": "2.2",
-          "tipoReto": "MULTI",
-          "puntos": 4,
-          "enunciado": "Seleccionen las medidas propias de una reanimación de control de daños.",
-          "opciones": [
-            {
-              "texto": "Transfusión en proporción balanceada de hemoderivados",
-              "correcta": true
-            },
-            {
-              "texto": "Hipotensión permisiva hasta controlar la hemorragia",
-              "correcta": true
-            },
-            {
-              "texto": "Recalentamiento activo del paciente",
-              "correcta": true
-            },
-            {
-              "texto": "Reposición con grandes volúmenes de cristaloides",
-              "correcta": false
-            }
-          ]
-        },
-        {
-          "codigo": "2.3",
-          "tipoReto": "TRUEFALSE",
-          "puntos": 4,
-          "enunciado": "La reposición masiva con cristaloides agrava simultáneamente la hipotermia y la coagulopatía del paciente.",
-          "respuesta": true,
-          "tiempoPorPregunta": 30
-        }
-      ],
-      "candadoDespues": {
-        "codigo": "2.4",
-        "tipoReto": "CODE",
-        "puntos": 2,
-        "titulo": "Clave de Salida · Tríada Letal",
-        "enunciado": "¿Cuál es la proporción balanceada de plasma, plaquetas y glóbulos rojos que abre el candado de esta estación?",
-        "tiempoPorPregunta": null,
-        "pista": "La proporción de plasma, plaquetas y glóbulos rojos.",
-        "placeholder": "· · · ·",
-        "boton": "DESBLOQUEAR",
-        "clave": "1-1-1"
-      },
-      "tiempoPorPregunta": 40
-    },
-    {
-      "id": "E3",
-      "orden": 3,
-      "nombre": "El Quirófano Abreviado",
-      "signoVital": "Presión arterial",
-      "revisionClinica": "PENDIENTE",
-      "descripcionMapa": "Laparotomía de control de daños. Aquí no se repara: se contiene.",
-      "briefing": "Están dentro del abdomen y el paciente no tolera una cirugía larga. La laparotomía abreviada tiene un solo objetivo: parar la hemorragia y la contaminación, y salir. Toda reconstrucción definitiva es una decisión para otro día. La clave de salida son los minutos que no deben superar.",
-      "mensajeExito": "Abdomen controlado y cerrado temporalmente. Presión recuperada. Regresen al monitor.",
-      "tiempoMaxSeg": 720,
-      "tipoReto": "SINGLE",
-      "fondo": "imagenes/e3.png",
-      "preguntas": [
-        {
-          "codigo": "3.1",
-          "tipoReto": "SORT",
-          "puntos": 4,
-          "enunciado": "Ordenen la secuencia correcta de la laparotomía de control de daños.",
-          "items": [
-            {
-              "texto": "Control de la hemorragia",
-              "orden": 0
-            },
-            {
-              "texto": "Control de la contaminación",
-              "orden": 1
-            },
-            {
-              "texto": "Empaquetamiento (packing)",
-              "orden": 2
-            },
-            {
-              "texto": "Cierre temporal del abdomen",
-              "orden": 3
-            }
-          ],
-          "tiempoPorPregunta": 45
-        },
-        {
-          "codigo": "3.2",
-          "tipoReto": "SINGLE",
-          "puntos": 4,
-          "enunciado": "¿Cuál de estas NO es una conducta de control de daños en el primer tiempo quirúrgico?",
-          "opciones": [
-            {
-              "texto": "Empaquetamiento hepático para hemorragia no quirúrgica",
-              "correcta": false
-            },
-            {
-              "texto": "Anastomosis intestinal definitiva con reconstrucción del tránsito",
-              "correcta": true
-            },
-            {
-              "texto": "Ligadura vascular temporal",
-              "correcta": false
-            },
-            {
-              "texto": "Cierre temporal con sistema de presión negativa",
-              "correcta": false
-            }
-          ]
-        },
-        {
-          "codigo": "3.3",
-          "tipoReto": "SINGLE",
-          "puntos": 4,
-          "enunciado": "¿Cuál es la duración objetivo que no debería superar una laparotomía de control de daños?",
-          "opciones": [
-            {
-              "texto": "180 minutos",
-              "correcta": false
-            },
-            {
-              "texto": "45 minutos",
-              "correcta": false
-            },
-            {
-              "texto": "90 minutos",
-              "correcta": true
-            },
-            {
-              "texto": "240 minutos",
-              "correcta": false
-            }
-          ]
-        }
-      ],
-      "candadoDespues": {
-        "codigo": "3.4",
-        "tipoReto": "CODE",
-        "puntos": 2,
-        "titulo": "Clave de Salida · Quirófano Abreviado",
-        "enunciado": "Introduzcan los minutos objetivo de la cirugía abreviada como clave de esta estación.",
-        "tiempoPorPregunta": null,
-        "pista": "Los minutos objetivo de la cirugía abreviada.",
-        "placeholder": "· · · ·",
-        "boton": "DESBLOQUEAR",
-        "clave": "90"
-      },
-      "tiempoPorPregunta": 35
-    },
-    {
-      "id": "E4",
-      "orden": 4,
-      "nombre": "La Unidad de Críticos",
-      "signoVital": "Frecuencia cardiaca",
-      "revisionClinica": "PENDIENTE",
-      "descripcionMapa": "Donde se corrige la fisiología y se cierra la misión.",
-      "briefing": "El abdomen quedó abierto y el paciente entra a cuidados críticos. Aquí no se opera: se recalienta, se corrige la acidosis y se repone la coagulación. Vigilen el abdomen, porque lo que salvó al paciente también puede ahogarlo. Para salir necesitarán las claves de las cuatro estaciones: tengan a mano el registro del Copiloto.",
-      "mensajeExito": "Fisiología corregida y reoperación programada. Ritmo recuperado. La misión está cerrada.",
-      "tiempoMaxSeg": 720,
-      "tipoReto": "SINGLE",
-      "fondo": "imagenes/e4.png",
-      "preguntas": [
-        {
-          "codigo": "4.1",
-          "tipoReto": "TRUEFALSE",
-          "puntos": 4,
-          "enunciado": "El objetivo en cuidados críticos tras el control de daños es corregir hipotermia, acidosis y coagulopatía antes de la reoperación.",
-          "respuesta": true,
-          "tiempoPorPregunta": 30
-        },
-        {
-          "codigo": "4.2",
-          "tipoReto": "SINGLE",
-          "puntos": 4,
-          "enunciado": "¿Qué hallazgo debe hacer sospechar un síndrome compartimental abdominal?",
-          "opciones": [
-            {
-              "texto": "Dolor abdominal que cede con analgesia",
-              "correcta": false
-            },
-            {
-              "texto": "Fiebre en las primeras 6 horas del postoperatorio",
-              "correcta": false
-            },
-            {
-              "texto": "Presión intraabdominal sostenida por encima de 20 mmHg con disfunción orgánica nueva",
-              "correcta": true
-            },
-            {
-              "texto": "Descenso aislado de la hemoglobina sin cambios hemodinámicos",
-              "correcta": false
-            }
-          ]
-        },
-        {
-          "codigo": "4.3",
-          "tipoReto": "SINGLE",
-          "puntos": 4,
-          "enunciado": "¿Cuál es el criterio principal para llevar al paciente a la reoperación definitiva?",
-          "opciones": [
-            {
-              "texto": "Que hayan transcurrido exactamente 12 horas desde la primera cirugía",
-              "correcta": false
-            },
-            {
-              "texto": "Haber corregido la tríada letal y alcanzado estabilidad hemodinámica",
-              "correcta": true
-            },
-            {
-              "texto": "Que el paciente recupere el estado de alerta",
-              "correcta": false
-            },
-            {
-              "texto": "Que el drenaje abdominal deje de producir",
-              "correcta": false
-            }
-          ]
-        }
-      ],
-      "candadoDespues": {
-        "codigo": "4.4",
-        "tipoReto": "SINGLE",
-        "puntos": 2,
-        "titulo": "Clave Maestra de la Misión",
-        "enunciado": "Combinen las claves de salida de las cuatro estaciones, en orden, para liberar al paciente.",
-        "opciones": [
-          {
-            "texto": "348-25 · 1-1-1 · 90 · 20",
-            "correcta": true
-          },
-          {
-            "texto": "20 · 90 · 1-1-1 · 348-25",
-            "correcta": false
-          },
-          {
-            "texto": "348-25 · 1-2-4 · 45 · 20",
-            "correcta": false
-          },
-          {
-            "texto": "350-25 · 1-1-1 · 90 · 12",
-            "correcta": false
-          }
-        ],
-        "tiempoPorPregunta": null,
-        "pista": "Necesitan las claves de las cuatro estaciones."
-      },
-      "tiempoPorPregunta": 35
-    }
-  ]
-};
+const SB_URL = 'https://nvgkhdrrxqdgxktfkioa.supabase.co';
+const SB_KEY = 'sb_publishable_d1RrtE7S-9a8e8mGKRRjxQ_4HU_nkDl';
+async function rpc(fn, args){
+  const r = await fetch(SB_URL + '/rest/v1/rpc/' + fn, {
+    method:'POST',
+    headers:{ apikey:SB_KEY, Authorization:'Bearer '+SB_KEY, 'Content-Type':'application/json' },
+    body: JSON.stringify(args || {})
+  });
+  const txt = await r.text();
+  let d = null; try { d = txt ? JSON.parse(txt) : null; } catch(e){ d = txt; }
+  if(!r.ok) throw new Error((d && (d.message || d.details)) || ('HTTP '+r.status));
+  return d;
+}
 
-const T = GAME.textos, CFG = GAME.config, EST = GAME.estaciones;
+let GAME=null, T=null, EST=null;
 const LOGO = '<svg viewBox="0 0 1106.5 276.9" xmlns="http://www.w3.org/2000/svg"><path d="M89.5 51.3c0-19.3-13.9-31.6-33.6-31.6S21.2 33.9 21.2 54.8s15 35.5 40.1 35.5h42.4c59.8 0 98.7 40.5 98.7 93.3 0 53.2-40.1 93.3-94.9 93.3-55.9 0-94.9-38.6-94.9-91.8 0-19.3 6.6-39.7 16.6-54.8H52c-11.6 15-17.7 33.9-17.7 53.2 0 42 30.5 73.3 73.3 73.3s73.3-31.2 73.3-73.3-30.5-73.3-77.1-73.3h-42C19.7 110.3 0 85.2 0 54.8 0 24.7 25.1 0 55.9 0c33.9 0 54.8 22.8 54.8 49.4 0 3.2-.4 7.5-1.4 10.4h-21c.7-2.3 1.2-6.2 1.2-8.5z" fill="#05dd4d"/><path d="M606.3 144c-1 0-1.6.8-1.6 1.8 1.2 18.6 14.4 32.8 32.6 32.8 14.8 0 23.8-6.2 28.4-16h14.8c-5.6 19.2-22.4 29.4-43.2 29.4-30 0-47.4-21.6-47.4-52.8 0-28.8 20-51.2 47.2-51.2 26.2 0 44.6 18.6 44.6 46 0 3 0 6.2-.4 10h-75zm229.4 31.6h12.4V189h-12.2c-23.4 0-31.2-10.2-31.2-29.4V106c0-1.4-.8-2-2.2-2h-14.6V90.6h14.6c1.4 0 2.2-.6 2.2-2V62h14.8v26.6c0 1.4.6 2 2 2h26.6V104h-26.6c-1.4 0-2 .6-2 2v55.2c0 11.8 2.4 14.4 16.2 14.4zm237.6-87.8c19.8 0 33.2 13.4 33.2 35.6V189h-15v-61.2c0-16.4-7.2-26.2-22.8-26.2-16 0-26 11.6-26 28.4v59h-14.8v-61.2c0-16.4-7.4-26.2-23-26.2-16 0-26 12.4-26 28.4v59h-14.8V90.6h14.2v13.6c0 1.6 1.6 1.8 2.4.6 8-13 17.2-17 29-17 12.4 0 23 6 29.4 18.8.6 1 2.2 1.2 2.8 0 7.2-13 17.8-18.8 31.4-18.8zM895.9 192c-20.2 0-33.8-14.2-33.8-36.4v-65h15v60.8c0 17.4 8.4 27.2 24.2 27.2 17.4 0 28.6-13.2 28.6-29.2V90.6h14.8V189h-14v-15.8c0-1.8-1.8-2.2-2.6-.8-8 14.8-18.6 19.6-32.2 19.6zM746.3 87.8c20.4 0 34 14 34 36.4V189h-15v-60.8c0-17.4-8.4-27.2-24.2-27.2-17.4 0-28.6 13.2-28.6 29.2V189h-15V90.6h14.2v16c0 1.6 1.8 1.8 2.4.6 8.2-14.8 18.8-19.4 32.2-19.4zm-141.2 42.4c0 1.4 1 1.8 2 1.8h57.2c1.4 0 2.2-.6 2.2-2.2-.4-16.8-12.8-28.6-29.4-28.6-16.8 0-29.8 12-32 29zm-62.8 40.4l30-80h15.2L549.3 189h-16.6l-38.2-98.4h15.6l30 80c.2.6.6.8 1 .8.6 0 1-.2 1.2-.8zM467.9 49v140h14.8V49h-14.8zm-64.4 143c-28.2 0-48-22-48.8-52.2s21.2-52 48.8-52c28.4 0 49 21.8 49 52s-21.2 52.2-49 52.2zm0-90.8c-19.8 0-34 15.4-34 38.6s14.2 38.6 34 38.6c20 0 34-15.4 34-38.6s-14-38.6-34-38.6zm-102.2-.6c-15.2 0-23.4 6.4-23.4 15.2 0 8 6.6 11.6 18 13.8l18.6 3.6c21 4 29.4 14.8 29.4 29.4 0 18-15 29.4-39.8 29.4-24 0-41.8-10-42.6-33.2h14.6c2 14.8 13.2 20.4 28.6 20.4 14.2 0 23.8-5.2 23.8-15.6 0-9.2-6.2-14.8-19-17l-18.6-3.2c-19-3.2-27.6-12.8-27.6-26.4 0-17.2 13.6-29.2 38-29.2 21 0 38 9.8 39.2 30.2h-14.4c-1.6-10-10.2-17.4-24.8-17.4z" fill="#DBFFF0"/></svg>';
-
-/* Posición de cada estación sobre la ilustración del mapa (los cuatro módulos). */
 const NODOS = [{x:27,y:31},{x:73,y:31},{x:27,y:72},{x:73,y:72}];
 
 const stage = document.getElementById('stage');
 const esc = s => String(s ?? '').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const mmss = s => { s=Math.max(0,Math.floor(s));
   return String(Math.floor(s/60)).padStart(2,'0')+':'+String(s%60).padStart(2,'0'); };
-/* Normaliza el código tecleado: ignora guiones, espacios y mayúsculas. */
-const norm = s => String(s??'').toUpperCase().replace(/[^A-Z0-9]/g,'');
 
 let S, timerId=null, timeLeft=0, locked=false, work=null;
 function reset(){
-  S = { est:0, q:0, gemas:[], puntos:0, aciertos:0, intentos:0, t0:Date.now(), estT0:0,
-        porEstacion: EST.map(e=>({nombre:e.nombre,intentos:0,tiempo:0})) };
+  S = { partida:null, equipo:'', est:0, q:0, puntos:0, aciertos:0, intentos:0,
+        hechas:[], t0:Date.now(), estT0:0 };
 }
 
-/* =========================================================================
-   SONIDO — sintetizado, sin archivos. Arranca en silencio.
-   ========================================================================= */
+/* ---------------- Sonido sintetizado ---------------- */
 const SFX = (()=>{
   let ctx=null, amb=null, on=false;
   const nuevo = ()=>{ if(!ctx) ctx = new (window.AudioContext||window.webkitAudioContext)(); return ctx; };
@@ -756,7 +280,7 @@ const SFX = (()=>{
       else if(amb){ amb.o.stop(); amb.o2.stop(); amb=null; }
       return on;
     },
-    ambiente(){   /* zumbido grave de sala */
+    ambiente(){
       if(!on||amb) return; const c=nuevo();
       const o=c.createOscillator(), o2=c.createOscillator(), g=c.createGain(), f=c.createBiquadFilter();
       o.type='sine'; o.frequency.value=54; o2.type='sine'; o2.frequency.value=81;
@@ -764,74 +288,90 @@ const SFX = (()=>{
       o.connect(f); o2.connect(f); f.connect(g).connect(c.destination); o.start(); o2.start();
       amb={o,o2,g};
     },
-    pulso(){ tono(880,null,.09,'sine',.10); },            /* latido del monitor */
+    pulso(){ tono(880,null,.09,'sine',.10); },
     clic(){  tono(420,null,.05,'square',.05); },
     acierto(){ tono(660,1320,.34,'sine',.20); },
-    fallo(){  tono(300,90,.75,'sawtooth',.22); },
-    abrir(){  tono(520,1560,.5,'triangle',.20); },
-    tic(){    tono(1500,null,.04,'square',.07); }
+    fallo(){ tono(300,90,.75,'sawtooth',.22); },
+    abrir(){ tono(520,1560,.5,'triangle',.20); },
+    tic(){   tono(1500,null,.04,'square',.07); }
   };
 })();
 
-/* =========================================================================
-   PIEZAS COMUNES
-   ========================================================================= */
+/* ---------------- Piezas comunes ---------------- */
 function fondoDe(url){
   return `<div class="bg" style="background-image:url('${esc(url)}')"></div>
           <div class="scrim"></div><div class="grain"></div>`;
 }
 function barra({reloj=false,casa=true,atras=false}={}){
-  return `<div class="top">
-    <div class="tl">
+  return `<div class="top"><div class="tl">
       ${casa?`<button class="ico" data-a="salir" title="Salir">⌂</button>`:''}
       ${atras?`<button class="ico" data-a="mapa" title="Volver al mapa">↺</button>`:''}
       <button class="ico" data-a="sonido" title="Sonido">${SFX.activo?'🔊':'🔇'}</button>
-    </div>
-    <div class="tr">
-      ${CFG.mostrarPuntuacion?`<div class="score">${S.puntos} PTS</div>`:''}
+    </div><div class="tr">
+      <div class="score">${S.puntos} PTS</div>
       ${reloj?`<div class="timer" id="timer">--:--</div>`:''}
     </div></div>`;
 }
 function vitales(){
-  const linea = '0,11 8,11 12,11 15,3 18,19 21,8 24,11 36,11';
-  return `<div class="vitals">${EST.map((e,i)=>
-    `<div class="vital ${S.gemas.includes(i)?'got':''}" title="${esc(e.signoVital||'')}">
-       <svg viewBox="0 0 36 22"><polyline points="${linea}"/></svg></div>`).join('')}</div>`;
+  const l='0,11 8,11 12,11 15,3 18,19 21,8 24,11 36,11';
+  return `<div class="vitals">${EST.map(e=>
+    `<div class="vital ${S.hechas.includes(e.id)?'got':''}" title="${esc(e.signoVital||'')}">
+       <svg viewBox="0 0 36 22"><polyline points="${l}"/></svg></div>`).join('')}</div>`;
 }
-const marca = `<div class="brand">${LOGO}</div>`;
-
-function pinta(html){ if(timerId){clearInterval(timerId);timerId=null;} stage.innerHTML = html + marca; }
-function ajustar(){ stage.style.transform = 'scale('+Math.min(innerWidth/1280, innerHeight/720)+')'; }
+function pinta(html){ if(timerId){clearInterval(timerId);timerId=null;}
+  stage.innerHTML = html + `<div class="brand">${LOGO}</div>`; }
+function ajustar(){ stage.style.transform='scale('+Math.min(innerWidth/1280, innerHeight/720)+')'; }
 addEventListener('resize', ajustar);
 
-/* =========================================================================
-   PANTALLAS
-   ========================================================================= */
+/* ---------------- Pantallas ---------------- */
+function pCargando(msg){
+  pinta(`<div class="screen"><div class="layer"><div class="center">
+    <div class="spin"></div><p style="color:rgba(219,255,240,.6)">${esc(msg||'Conectando…')}</p>
+  </div></div></div>`);
+}
+function pError(msg){
+  pinta(`<div class="screen"><div class="layer"><div class="center">
+    <div style="font-size:40px">⚠️</div><h2>Sin conexión</h2>
+    <p style="max-width:520px;text-align:center;color:rgba(219,255,240,.7)">${esc(msg)}</p>
+    <button class="btn" onclick="location.reload()">Reintentar</button>
+  </div></div></div>`);
+}
 function pPortada(){
-  pinta(`<div class="screen on">${fondoDe(GAME.juego.imagenPortada)}
+  pinta(`<div class="screen">${fondoDe(GAME.imagenPortada)}
     <div class="layer"><div class="center">
       <div class="titlebox">
-        <div class="kicker">${esc(GAME.juego.subtitulo)}</div>
-        <h1 style="margin-top:12px">${esc(GAME.juego.titulo)}</h1>
+        <div class="kicker">${esc(GAME.subtitulo)}</div>
+        <h1 style="margin-top:12px">${esc(GAME.titulo)}</h1>
       </div>
-      <button class="btn solid" data-a="intro">${esc(GAME.juego.botonInicio)} →</button>
+      <button class="btn solid" data-a="registro">${esc(GAME.botonInicio)} →</button>
     </div></div>
     <div class="hint">F pantalla completa · R reiniciar</div></div>`);
 }
-
-function pIntro(){
-  pinta(`<div class="screen on">${fondoDe(GAME.juego.imagenPortada)}
+function pRegistro(){
+  pinta(`<div class="screen">${fondoDe(GAME.imagenPortada)}
     <div class="layer">${barra({casa:false})}
-      <div class="wrap"><div class="panel"><p class="narr">${esc(GAME.juego.intro)}</p></div></div>
-    </div>
-    <div class="floatbtn"><button class="btn solid" data-a="mapa">${esc(T.siguiente)} →</button></div>
-  </div>`);
+      <div class="wrap"><div class="panel" style="max-width:560px;text-align:center">
+        <div class="kicker">Identificación de la tripulación</div>
+        <p style="margin:18px 0 20px;font-size:16px;color:rgba(219,255,240,.8)">
+          El Comandante de Misión registra el nombre del equipo antes de entrar.</p>
+        <input class="inp" id="equipo" maxlength="60" placeholder="Nombre del equipo" autocomplete="off">
+        <input class="inp" id="jornada" maxlength="40" placeholder="Jornada (opcional)"
+               autocomplete="off" style="margin-top:12px">
+        <div class="lockerr" id="regerr"></div>
+        <button class="btn solid" style="margin-top:8px" data-a="entrar">Entrar →</button>
+      </div></div></div></div>`);
+  setTimeout(()=>document.getElementById('equipo')?.focus(), 60);
 }
-
+function pIntro(){
+  pinta(`<div class="screen">${fondoDe(GAME.imagenPortada)}
+    <div class="layer">${barra({casa:false})}
+      <div class="wrap"><div class="panel"><p class="narr">${esc(GAME.intro)}</p></div></div></div>
+    <div class="floatbtn"><button class="btn solid" data-a="mapa">${esc(T.siguiente)} →</button></div></div>`);
+}
 function estadoDe(i){
-  if(S.gemas.includes(i)) return 'done';
-  const pendiente = EST.findIndex((_,k)=>!S.gemas.includes(k));
-  return i===pendiente ? 'avail' : 'locked';
+  if(S.hechas.includes(EST[i].id)) return 'done';
+  const pend = EST.findIndex(e=>!S.hechas.includes(e.id));
+  return i===pend ? 'avail' : 'locked';
 }
 function pMapa(){
   const nodos = EST.map((e,i)=>{
@@ -841,47 +381,45 @@ function pMapa(){
       <div class="ring">${st==='done'?'✓':i+1}</div>
       <div class="lbl">${esc(e.signoVital||e.nombre)}</div>
       <div class="card"><b>${esc(e.nombre)}</b><span>${esc(e.descripcionMapa)}</span></div>
-    </div>`;
-  }).join('');
-  pinta(`<div class="screen on">${fondoDe(GAME.juego.hub.imagenMapa)}
+    </div>`; }).join('');
+  pinta(`<div class="screen">${fondoDe(GAME.hub.imagenMapa)}
     <div class="core"></div>
     <div class="layer">${barra({casa:false})}${vitales()}
       <div class="maptitle">
-        <div class="kicker">${esc(GAME.juego.hub.titulo)}</div>
-        <h2 style="margin-top:10px">${S.gemas.length} / ${EST.length} ${esc(GAME.juego.coleccionable.plural)}</h2>
-      </div>
-      ${nodos}
-      <div class="maphint">${esc(GAME.juego.hub.instruccion)}</div>
-    </div>
-    ${EST.every((_,i)=>S.gemas.includes(i))
+        <div class="kicker">${esc(GAME.hub.titulo)}</div>
+        <h2 style="margin-top:10px">${S.hechas.length} / ${EST.length} ${esc(GAME.coleccionable.plural)}</h2>
+      </div>${nodos}
+      <div class="maphint">${esc(GAME.hub.instruccion)}</div></div>
+    ${S.hechas.length===EST.length
       ? `<div class="floatbtn"><button class="btn solid" data-a="informe">${esc(T.resultadosTitulo)} →</button></div>`:''}
   </div>`);
 }
-
 function pBriefing(){
   const e = EST[S.est];
-  pinta(`<div class="screen on">${fondoDe(e.fondo)}
+  pinta(`<div class="screen">${fondoDe(e.fondo)}
     <div class="layer">${barra()}${vitales()}
       <div class="wrap"><div class="panel">
         <div class="kicker" style="text-align:center">${esc(e.signoVital||'')}</div>
         <h2 style="text-align:center;margin:12px 0 18px">${esc(e.nombre)}</h2>
         <p class="narr" style="font-size:17px">${esc(e.briefing)}</p>
-      </div></div>
-    </div>
-    <div class="floatbtn"><button class="btn solid" data-a="empezar">${esc(T.siguiente)} →</button></div>
-  </div>`);
+      </div></div></div>
+    <div class="floatbtn"><button class="btn solid" data-a="empezar">${esc(T.siguiente)} →</button></div></div>`);
 }
-
-function tipoDe(e,q){ return q.tipoReto || e.tipoReto; }
-function segDe(e,q){ return q.tiempoPorPregunta !== undefined ? q.tiempoPorPregunta : e.tiempoPorPregunta; }
+const tipoDe = (e,q) => q.tipoReto || e.tipoReto;
+const segDe  = (e,q) => q.tiempoPorPregunta !== undefined ? q.tiempoPorPregunta : e.tiempoPorPregunta;
+const preguntaActual = () => {
+  const e = EST[S.est];
+  return S.q < e.preguntas.length ? e.preguntas[S.q] : e.candadoDespues;
+};
 
 function pPregunta(){
-  const e = EST[S.est], q = e.preguntas[S.q], t = tipoDe(e,q);
+  const e = EST[S.est], q = preguntaActual(), t = tipoDe(e,q);
   locked = false;
-  let cuerpo = '';
+  if(t === 'CODE') return pCandado(q);
 
+  let cuerpo='';
   if(t === 'SORT'){
-    work = barajar(q.items);
+    work = q.items.slice();               // ya vienen barajados del servidor
     cuerpo = filasSort();
   } else if(t === 'MULTI'){
     work = new Set();
@@ -897,221 +435,171 @@ function pPregunta(){
     cuerpo = q.opciones.map((o,i)=>
       `<button class="opt" data-single="${i}"><span class="box">${'ABCD'[i]||i+1}</span>${esc(o.texto)}</button>`).join('');
   }
-
   const seg = segDe(e,q);
-  pinta(`<div class="screen on">${fondoDe(e.fondo)}
+  pinta(`<div class="screen">${fondoDe(e.fondo)}
     <div class="layer">${barra({reloj:seg!=null, atras:true})}${vitales()}
       <div class="wrap"><div class="panel">
         <div class="qnum">${S.q+1}/${e.preguntas.length}</div>
         <p class="qtext">${esc(q.enunciado)}</p>
         <div id="cuerpo">${cuerpo}</div>
         <div class="qfoot"><button class="btn solid" id="enviar" data-a="enviar">${esc(T.enviar)}</button></div>
-      </div></div>
-    </div></div>`);
-
+      </div></div></div></div>`);
   SFX.pulso();
   if(seg != null) arrancarReloj(seg);
 }
-
-function barajar(items){
-  if(items.length < 2) return items.slice();
-  let a;
-  for(let i=0;i<40;i++){
-    a = items.slice();
-    for(let j=a.length-1;j>0;j--){ const k=Math.floor(Math.random()*(j+1)); [a[j],a[k]]=[a[k],a[j]]; }
-    if(!a.every((it,n)=>it.orden===n)) return a;
-  }
-  [a[0],a[1]]=[a[1],a[0]]; return a;
-}
 function filasSort(){
-  return work.map((it,i)=>`<div class="srow" data-row="${i}">
+  return work.map((it,i)=>`<div class="srow">
     <div class="idx">${i+1}</div><div class="body">${esc(it.texto)}</div>
     <div class="arrows">
       <button data-up="${i}" ${i===0?'disabled':''} aria-label="Subir">▲</button>
       <button data-down="${i}" ${i===work.length-1?'disabled':''} aria-label="Bajar">▼</button>
     </div></div>`).join('');
 }
-
 function arrancarReloj(seg){
   timeLeft = seg;
-  const pintarReloj = ()=>{
-    const el = document.getElementById('timer'); if(!el) return;
+  const pintarReloj = ()=>{ const el=document.getElementById('timer'); if(!el) return;
     el.textContent = mmss(timeLeft);
-    el.className = 'timer' + (timeLeft<=5?' crit' : timeLeft<=10?' warn' : '');
-  };
+    el.className = 'timer' + (timeLeft<=5?' crit' : timeLeft<=10?' warn' : ''); };
   pintarReloj();
   timerId = setInterval(()=>{
     timeLeft--; pintarReloj();
     if(timeLeft<=5 && timeLeft>0) SFX.tic();
-    if(timeLeft<=0){ clearInterval(timerId); timerId=null; fallar(); }
-  }, 1000);
+    if(timeLeft<=0){ clearInterval(timerId); timerId=null; enviar(true); }
+  },1000);
 }
 
 /* =========================================================================
-   CORRECCIÓN  ← ÚNICO PUNTO A MOVER AL SERVIDOR EN PRODUCCIÓN
+   ENVÍO — la corrección la hace el servidor. Aquí no hay respuestas.
    ========================================================================= */
-function evaluar(){
-  const e = EST[S.est], q = e.preguntas[S.q], t = tipoDe(e,q);
-  if(t === 'SORT')      return work.every((it,i)=>it.orden===i);
-  if(t === 'TRUEFALSE') return work === q.respuesta;
-  if(t === 'MULTI'){
-    const need = new Set(q.opciones.map((o,i)=>o.correcta?i:-1).filter(i=>i>=0));
-    return work.size===need.size && [...need].every(i=>work.has(i));
-  }
-  return work != null && q.opciones[work] && q.opciones[work].correcta === true;
+function cargaUtil(){
+  const e = EST[S.est], t = tipoDe(e, preguntaActual());
+  if(t === 'SORT')      return work.map(it=>it.id);
+  if(t === 'MULTI')     return [...work];
+  if(t === 'TRUEFALSE') return work;
+  return work;                        // SINGLE: índice
 }
-
-function enviar(){
+async function enviar(porTiempo){
   if(locked) return; locked = true;
   if(timerId){ clearInterval(timerId); timerId=null; }
-  const ok = evaluar();
+  const e = EST[S.est], q = preguntaActual();
   const b = document.getElementById('enviar');
-  if(b){ b.textContent = T.enviado; b.disabled = true; }
-  marcar(ok);
-  if(ok){
-    const e = EST[S.est], q = e.preguntas[S.q];
-    S.aciertos++;
-    S.puntos += q.puntos * CFG.escalaPuntos
-              + (segDe(e,q)!=null ? Math.max(0,timeLeft) * CFG.bonusPorSegundoRestante : 0);
+  if(b){ b.disabled = true; b.textContent = T.enviado; }
+
+  if(!porTiempo && work == null){ locked=false; if(b){b.disabled=false;b.textContent=T.enviar;} return; }
+
+  let r;
+  try {
+    r = await rpc('evoforma2_responder', {
+      p_partida: S.partida, p_estacion: e.id, p_codigo: q.codigo,
+      p_respuesta: porTiempo ? null : cargaUtil(),
+      p_seg_restantes: Math.max(0, timeLeft)
+    });
+  } catch(err){ locked=false; return pError(err.message); }
+
+  S.puntos = r.puntos; S.aciertos = r.aciertos; S.intentos = r.intentos;
+  S.hechas = r.estaciones_ok || [];
+  marcar(r.correcta);
+
+  if(r.correcta){
     SFX.acierto();
     const f = document.createElement('div'); f.className='flash'; stage.appendChild(f);
-    setTimeout(siguientePregunta, 1150);
+    setTimeout(()=> r.estacion_superada ? completarEstacion() : siguiente(), 1150);
   } else {
     setTimeout(fallar, 650);
   }
 }
-
+/* Solo se marca lo que el equipo eligió: el servidor no dice cuál era la buena,
+   así REPETIR sigue exigiendo pensar. */
 function marcar(ok){
-  const e = EST[S.est], q = e.preguntas[S.q], t = tipoDe(e,q);
-  if(t === 'SORT'){
-    document.querySelectorAll('.srow').forEach((r,i)=>
-      r.classList.add(work[i].orden===i ? 'ok' : 'bad'));
-  } else if(t === 'MULTI'){
-    document.querySelectorAll('[data-multi]').forEach(b=>{
-      const i=+b.dataset.multi; b.disabled=true;
-      if(q.opciones[i].correcta) b.classList.add('ok');
-      else if(work.has(i)) b.classList.add('bad');
-    });
+  const e = EST[S.est], t = tipoDe(e, preguntaActual()), clase = ok?'ok':'bad';
+  if(t === 'SORT'){ document.querySelectorAll('.srow').forEach(r=>r.classList.add(clase)); }
+  else if(t === 'MULTI'){
+    document.querySelectorAll('[data-multi]').forEach(b=>{ b.disabled=true;
+      if(work.has(+b.dataset.multi)) b.classList.add(clase); });
   } else if(t === 'TRUEFALSE'){
-    document.querySelectorAll('[data-tf]').forEach(b=>{
-      const v = b.dataset.tf==='true'; b.disabled=true;
-      if(v===q.respuesta) b.classList.add('ok'); else if(v===work) b.classList.add('bad');
-    });
+    document.querySelectorAll('[data-tf]').forEach(b=>{ b.disabled=true;
+      if((b.dataset.tf==='true')===work) b.classList.add(clase); });
   } else {
-    document.querySelectorAll('[data-single]').forEach(b=>{
-      const i=+b.dataset.single; b.disabled=true;
-      if(q.opciones[i].correcta) b.classList.add('ok');
-      else if(i===work) b.classList.add('bad');
-    });
+    document.querySelectorAll('[data-single]').forEach(b=>{ b.disabled=true;
+      if(+b.dataset.single===work) b.classList.add(clase); });
   }
 }
-
 function fallar(){
-  if(timerId){ clearInterval(timerId); timerId=null; }
-  locked = true;
-  S.intentos++; S.porEstacion[S.est].intentos++;
-  S.puntos = Math.max(0, S.puntos - CFG.penalizacionPorReintento);
-  SFX.fallo();
-  const ov = document.createElement('div');
-  ov.className='ov on'; ov.id='alarm';
+  locked = true; SFX.fallo();
+  const ov = document.createElement('div'); ov.className='ov'; ov.id='alarm';
   ov.innerHTML = `<div class="mask"></div><div class="slash"></div>
-    <div class="ovbox">
-      <h2>${esc(T.alarmaTitulo || 'CÓDIGO ROJO')}</h2>
-      <p>${esc(T.alarmaTexto || 'El paciente se descompensa. Vuelvan a intentarlo antes de perderlo.')}</p>
+    <div class="ovbox"><h2>${esc(T.alarmaTitulo)}</h2><p>${esc(T.alarmaTexto)}</p>
       <div class="row">
         <button class="btn solid" data-a="reintentar">REPETIR ↻</button>
-        ${CFG.permitirSalirDesdeAlarma?`<button class="btn ghost" data-a="mapa">${esc(T.volverAlMapa)}</button>`:''}
+        <button class="btn ghost" data-a="mapa">${esc(T.volverAlMapa)}</button>
       </div></div>`;
   stage.appendChild(ov);
 }
-
-function siguientePregunta(){
+function siguiente(){
   const e = EST[S.est];
-  if(S.q < e.preguntas.length-1){ S.q++; pPregunta(); }
-  else if(e.candadoDespues){ pCandado(e.candadoDespues); }
-  else { completarEstacion(); }
+  if(S.q < e.preguntas.length - 1 || (S.q === e.preguntas.length - 1 && e.candadoDespues)){
+    S.q++; pPregunta();
+  } else completarEstacion();
 }
 
-/* ---------- Candado ---------- */
+/* ---------------- Candado ---------------- */
 function pCandado(c){
   const e = EST[S.est];
-  const esCodigo = (c.tipoReto === 'CODE');
-  const cuerpo = esCodigo
-    ? `<input class="lockin" id="codigo" maxlength="16" placeholder="${esc(c.placeholder||'')}" autocomplete="off">
-       <div class="lockerr" id="lockerr"></div>
-       <button class="btn solid" style="margin-top:6px" data-a="probar">${esc(c.boton||'DESBLOQUEAR')}</button>`
-    : (work=null, c.opciones.map((o,i)=>
-        `<button class="opt" data-lock="${i}"><span class="box">${'ABCD'[i]||i+1}</span>${esc(o.texto)}</button>`).join('')
-       + `<div class="lockerr" id="lockerr"></div>
-          <div class="qfoot"><button class="btn solid" data-a="probarOpcion">${esc(c.boton||'DESBLOQUEAR')}</button></div>`);
-
-  pinta(`<div class="screen on">${fondoDe(e.fondo)}
+  pinta(`<div class="screen">${fondoDe(e.fondo)}
     <div class="layer">${barra({atras:true})}${vitales()}
       <div class="wrap"><div class="panel" style="text-align:center;max-width:760px">
         <div class="kicker">${esc(c.titulo)}</div>
         <p class="qtext" style="margin:16px 0 20px;font-size:18px">${esc(c.enunciado)}</p>
         ${c.pista?`<p style="font-size:14px;color:var(--amber);margin-bottom:18px">▸ ${esc(c.pista)}</p>`:''}
-        ${cuerpo}
-      </div></div>
-    </div></div>`);
-  if(esCodigo) setTimeout(()=>{ const i=document.getElementById('codigo'); if(i) i.focus(); }, 60);
+        <input class="lockin" id="codigo" maxlength="20" placeholder="${esc(c.placeholder||'')}" autocomplete="off">
+        <div class="lockerr" id="lockerr"></div>
+        <button class="btn solid" style="margin-top:6px" data-a="probar">${esc(c.boton||'DESBLOQUEAR')}</button>
+      </div></div></div></div>`);
+  setTimeout(()=>document.getElementById('codigo')?.focus(), 60);
 }
-
-function probarCodigo(){
-  const c = EST[S.est].candadoDespues;
+async function probarCodigo(){
+  const e = EST[S.est], c = preguntaActual();
   const inp = document.getElementById('codigo'), err = document.getElementById('lockerr');
-  if(norm(inp.value) === norm(c.clave)){
-    S.puntos += c.puntos * CFG.escalaPuntos; S.aciertos++;
-    SFX.abrir(); abrirYSeguir();
+  if(!inp.value.trim()) return;
+  let r;
+  try {
+    r = await rpc('evoforma2_responder', { p_partida:S.partida, p_estacion:e.id,
+      p_codigo:c.codigo, p_respuesta:inp.value.trim(), p_seg_restantes:0 });
+  } catch(x){ return pError(x.message); }
+  S.puntos=r.puntos; S.aciertos=r.aciertos; S.intentos=r.intentos; S.hechas=r.estaciones_ok||[];
+  if(r.correcta){
+    SFX.abrir();
+    const s=document.createElement('div'); s.className='sweep'; stage.appendChild(s);
+    setTimeout(completarEstacion, 950);
   } else {
     err.textContent = 'Clave incorrecta. Revisen el registro del Copiloto.';
     inp.value=''; inp.focus(); SFX.fallo();
-    S.intentos++; S.porEstacion[S.est].intentos++;
-    S.puntos = Math.max(0, S.puntos - CFG.penalizacionPorReintento);
+    document.querySelector('.score').textContent = S.puntos + ' PTS';
   }
-}
-function probarOpcion(){
-  const c = EST[S.est].candadoDespues, err = document.getElementById('lockerr');
-  if(work != null && c.opciones[work] && c.opciones[work].correcta){
-    S.puntos += c.puntos * CFG.escalaPuntos; S.aciertos++;
-    SFX.abrir(); abrirYSeguir();
-  } else {
-    err.textContent = 'Combinación incorrecta.';
-    SFX.fallo(); S.intentos++; S.porEstacion[S.est].intentos++;
-    S.puntos = Math.max(0, S.puntos - CFG.penalizacionPorReintento);
-  }
-}
-function abrirYSeguir(){
-  const s = document.createElement('div'); s.className='sweep'; stage.appendChild(s);
-  setTimeout(completarEstacion, 950);
 }
 
-/* ---------- Cierre de estación ---------- */
 function completarEstacion(){
   const e = EST[S.est];
-  S.porEstacion[S.est].tiempo = Math.round((Date.now()-S.estT0)/1000);
-  if(!S.gemas.includes(S.est)) S.gemas.push(S.est);
-  pinta(`<div class="screen on">${fondoDe(e.fondo)}
+  if(!S.hechas.includes(e.id)) S.hechas.push(e.id);
+  pinta(`<div class="screen">${fondoDe(e.fondo)}
     <div class="layer">${barra({casa:false})}${vitales()}
       <div class="wrap"><div class="panel" style="text-align:center">
         <div class="kicker">${esc(e.signoVital||'')} RECUPERADO</div>
         <div style="font-size:46px;margin:16px 0">🫀</div>
         <p class="narr">${esc(e.mensajeExito)}</p>
-      </div></div>
-    </div>
-    <div class="floatbtn"><button class="btn solid" data-a="trasEstacion">${esc(T.siguiente)} →</button></div>
-  </div>`);
+      </div></div></div>
+    <div class="floatbtn"><button class="btn solid" data-a="trasEstacion">${esc(T.siguiente)} →</button></div></div>`);
   SFX.acierto();
 }
-function trasEstacion(){
-  if(EST.every((_,i)=>S.gemas.includes(i))) pInforme(); else pMapa();
-}
+function trasEstacion(){ S.hechas.length === EST.length ? pInforme() : pMapa(); }
 
-/* ---------- Informe ---------- */
-function pInforme(){
-  const total = Math.round((Date.now()-S.t0)/1000);
+async function pInforme(){
+  let fin = null;
+  try { fin = await rpc('evoforma2_finalizar', { p_partida: S.partida }); } catch(e){}
   const nQ = EST.reduce((a,e)=>a+e.preguntas.length+(e.candadoDespues?1:0),0);
-  pinta(`<div class="screen on">${fondoDe(GAME.juego.hub.imagenMapa)}
+  let rank = [];
+  try { rank = await rpc('evoforma2_ranking', {}); } catch(e){}
+  pinta(`<div class="screen">${fondoDe(GAME.hub.imagenMapa)}
     <div class="layer">${barra({casa:false})}
       <div class="wrap"><div class="panel">
         <div class="kicker" style="text-align:center">${esc(T.resultadosTitulo)}</div>
@@ -1119,88 +607,66 @@ function pInforme(){
           <div class="kpi"><b>${S.puntos}</b><span>PUNTOS</span></div>
           <div class="kpi"><b>${S.aciertos}/${nQ}</b><span>ACIERTOS</span></div>
           <div class="kpi"><b>${S.intentos}</b><span>REINTENTOS</span></div>
-          <div class="kpi"><b>${mmss(total)}</b><span>TIEMPO</span></div>
+          <div class="kpi"><b>${mmss(fin?fin.duracion_seg:0)}</b><span>TIEMPO</span></div>
         </div>
-        <table><thead><tr><th>ESTACIÓN</th><th>REINTENTOS</th><th>TIEMPO</th></tr></thead>
-          <tbody>${S.porEstacion.map(p=>
-            `<tr><td>${esc(p.nombre)}</td><td>${p.intentos}</td><td>${mmss(p.tiempo)}</td></tr>`).join('')}
-          </tbody></table>
-        <p style="text-align:center;margin-top:18px;font-size:16px">${esc(GAME.juego.cierre)}</p>
-      </div></div>
-    </div>
-    <div class="floatbtn"><button class="btn solid" data-a="gracias">${esc(T.finalizar)}</button></div>
-  </div>`);
+        <table><thead><tr><th>#</th><th>EQUIPO</th><th>PUNTOS</th><th>TIEMPO</th></tr></thead>
+          <tbody>${rank.slice(0,6).map((r,i)=>
+            `<tr><td>${i+1}</td><td>${esc(r.equipo)}</td><td>${r.puntos}</td>
+             <td>${mmss(r.duracion_seg)}</td></tr>`).join('')}</tbody></table>
+        <p style="text-align:center;margin-top:16px;font-size:15px">${esc(GAME.cierre)}</p>
+      </div></div></div>
+    <div class="floatbtn"><button class="btn solid" data-a="gracias">${esc(T.finalizar)}</button></div></div>`);
 }
 function pGracias(){
-  pinta(`<div class="screen on">${fondoDe(GAME.juego.imagenPortada)}
+  pinta(`<div class="screen">${fondoDe(GAME.imagenPortada)}
     <div class="layer"><div class="center">
-      <div class="titlebox"><h1 style="font-size:40px">${esc(GAME.juego.agradecimiento)}</h1></div>
+      <div class="titlebox"><h1 style="font-size:40px">${esc(GAME.agradecimiento)}</h1></div>
       <button class="btn" data-a="reiniciar">VOLVER A EMPEZAR ↻</button>
     </div></div></div>`);
 }
-
-/* ---------- Confirmación de salida ---------- */
 function confirmarSalida(){
-  const ov = document.createElement('div'); ov.className='ov on'; ov.id='salida';
-  ov.innerHTML = `<div class="mask"></div><div class="ovbox">
+  const ov=document.createElement('div'); ov.className='ov'; ov.id='salida';
+  ov.innerHTML=`<div class="mask"></div><div class="ovbox">
     <h2>${esc(T.salirTitulo)}</h2><p>${esc(T.salirTexto)}</p>
-    <div class="row">
-      <button class="btn ghost" data-a="cerrarOv">${esc(T.salirCancelar)}</button>
-      <button class="btn solid" data-a="reiniciar">${esc(T.salirConfirmar)}</button>
-    </div></div>`;
+    <div class="row"><button class="btn ghost" data-a="cerrarOv">${esc(T.salirCancelar)}</button>
+    <button class="btn solid" data-a="reiniciar">${esc(T.salirConfirmar)}</button></div></div>`;
   stage.appendChild(ov);
 }
 
-/* =========================================================================
-   EVENTOS
-   ========================================================================= */
-stage.addEventListener('click', ev=>{
-  const t = ev.target.closest('[data-a],[data-single],[data-multi],[data-tf],[data-lock],[data-up],[data-down]');
+/* ---------------- Eventos ---------------- */
+stage.addEventListener('click', async ev=>{
+  const t = ev.target.closest('[data-a],[data-single],[data-multi],[data-tf],[data-up],[data-down]');
   if(!t) return;
 
   if(t.dataset.up !== undefined || t.dataset.down !== undefined){
-    const i = +(t.dataset.up ?? t.dataset.down);
-    const j = t.dataset.up !== undefined ? i-1 : i+1;
-    [work[i],work[j]] = [work[j],work[i]];
-    document.getElementById('cuerpo').innerHTML = filasSort();
-    SFX.clic(); return;
+    const i=+(t.dataset.up ?? t.dataset.down), j = t.dataset.up!==undefined ? i-1 : i+1;
+    [work[i],work[j]]=[work[j],work[i]];
+    document.getElementById('cuerpo').innerHTML = filasSort(); SFX.clic(); return;
   }
-  if(t.dataset.multi !== undefined){
-    if(locked) return; const i = +t.dataset.multi;
+  if(t.dataset.multi !== undefined){ if(locked) return;
+    const i=+t.dataset.multi;
     if(work.has(i)){ work.delete(i); t.classList.remove('sel'); t.querySelector('.box').textContent=''; }
     else { work.add(i); t.classList.add('sel'); t.querySelector('.box').textContent='✓'; }
-    SFX.clic(); return;
-  }
-  if(t.dataset.tf !== undefined){
-    if(locked) return; work = t.dataset.tf==='true';
-    document.querySelectorAll('[data-tf]').forEach(b=>{
-      b.classList.remove('sel'); b.querySelector('.box').textContent=''; });
-    t.classList.add('sel'); t.querySelector('.box').textContent='✓'; SFX.clic(); return;
-  }
-  if(t.dataset.single !== undefined){
-    if(locked) return; work = +t.dataset.single;
-    document.querySelectorAll('[data-single]').forEach((b,i)=>{
-      b.classList.toggle('sel', i===work);
-      b.querySelector('.box').textContent = 'ABCD'[i]||i+1; });
-    SFX.clic(); return;
-  }
-  if(t.dataset.lock !== undefined){
-    work = +t.dataset.lock;
-    document.querySelectorAll('[data-lock]').forEach((b,i)=>b.classList.toggle('sel', i===work));
-    SFX.clic(); return;
-  }
+    SFX.clic(); return; }
+  if(t.dataset.tf !== undefined){ if(locked) return; work = t.dataset.tf==='true';
+    document.querySelectorAll('[data-tf]').forEach(b=>{b.classList.remove('sel');b.querySelector('.box').textContent='';});
+    t.classList.add('sel'); t.querySelector('.box').textContent='✓'; SFX.clic(); return; }
+  if(t.dataset.single !== undefined){ if(locked) return; work = +t.dataset.single;
+    document.querySelectorAll('[data-single]').forEach((b,i)=>{ b.classList.toggle('sel', i===work);
+      b.querySelector('.box').textContent='ABCD'[i]||i+1; });
+    SFX.clic(); return; }
 
   switch(t.dataset.a){
-    case 'intro':        pIntro(); break;
+    case 'registro':     pRegistro(); break;
+    case 'entrar':       await entrar(); break;
     case 'mapa':         pMapa(); break;
-    case 'estacion':     S.est = +t.dataset.i; S.q = 0; pBriefing(); break;
-    case 'empezar':      S.estT0 = Date.now(); pPregunta(); break;
-    case 'enviar':       enviar(); break;
+    case 'estacion':     S.est=+t.dataset.i; S.q=0; pBriefing(); break;
+    case 'empezar':      S.estT0=Date.now(); pPregunta(); break;
+    case 'enviar':       await enviar(false); break;
     case 'reintentar':   pPregunta(); break;
-    case 'probar':       probarCodigo(); break;
-    case 'probarOpcion': probarOpcion(); break;
+    case 'probar':       await probarCodigo(); break;
     case 'trasEstacion': trasEstacion(); break;
-    case 'informe':      pInforme(); break;
+    case 'informe':      await pInforme(); break;
     case 'gracias':      pGracias(); break;
     case 'salir':        confirmarSalida(); break;
     case 'cerrarOv':     document.getElementById('salida')?.remove(); break;
@@ -1208,17 +674,40 @@ stage.addEventListener('click', ev=>{
     case 'sonido':       SFX.alternar(); t.textContent = SFX.activo?'🔊':'🔇'; break;
   }
 });
-
-addEventListener('keydown', e=>{
-  const inp = document.getElementById('codigo');
-  if(e.key === 'Enter' && inp && document.activeElement === inp){ probarCodigo(); return; }
-  if(inp) return;
-  if(e.key.toLowerCase() === 'f') document.documentElement.requestFullscreen?.().catch(()=>{});
-  if(e.key.toLowerCase() === 'r'){ reset(); pPortada(); }
+addEventListener('keydown', async e=>{
+  const cod = document.getElementById('codigo');
+  if(e.key==='Enter' && cod && document.activeElement===cod){ await probarCodigo(); return; }
+  const eq = document.getElementById('equipo');
+  if(e.key==='Enter' && eq && document.activeElement===eq){ await entrar(); return; }
+  if(cod || eq) return;
+  if(e.key.toLowerCase()==='f') document.documentElement.requestFullscreen?.().catch(()=>{});
+  if(e.key.toLowerCase()==='r'){ reset(); pPortada(); }
 });
 
-/* arranque */
-reset(); ajustar(); pPortada();
+async function entrar(){
+  const nombre = document.getElementById('equipo').value.trim();
+  const err = document.getElementById('regerr');
+  if(!nombre){ err.textContent='Escriban el nombre del equipo.'; return; }
+  pCargando('Registrando tripulación…');
+  try{
+    const r = await rpc('evoforma2_iniciar', { p_equipo:nombre,
+      p_jornada: document.getElementById('jornada')?.value.trim() || null });
+    S.partida=r.partida_id; S.equipo=r.equipo; S.puntos=r.puntos;
+    S.aciertos=r.aciertos; S.intentos=r.intentos; S.hechas=r.estaciones_ok||[];
+    S.hechas.length ? pMapa() : pIntro();
+  } catch(x){ pError(x.message); }
+}
+
+/* ---------------- Arranque ---------------- */
+(async ()=>{
+  reset(); ajustar(); pCargando('Conectando con la torre de control…');
+  try{
+    const cfg = await rpc('evoforma2_config', {});
+    if(!cfg) throw new Error('El juego no está configurado en el servidor.');
+    GAME = cfg.juego; T = cfg.textos; EST = cfg.estaciones;
+    pPortada();
+  } catch(e){ pError(e.message); }
+})();
 </script>
 </body>
 </html>
