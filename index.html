@@ -40,7 +40,7 @@ html,body{height:100%;overflow:hidden;background:#000;color:var(--mint);
 button,input{font:inherit;color:inherit}
 button{cursor:pointer;border:none;background:none}
 :focus-visible{outline:2px solid var(--green);outline-offset:2px}
-@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+
 
 #viewport{position:fixed;inset:0;display:grid;place-items:center;background:#000}
 #stage{width:1280px;height:720px;position:relative;overflow:hidden;
@@ -205,20 +205,74 @@ th{font-family:var(--disp);font-size:10px;letter-spacing:.14em;color:rgba(219,25
   background:repeating-linear-gradient(115deg,rgba(255,68,56,.5) 0 90px,transparent 90px 230px);
   animation:slash .75s ease-out}
 @keyframes slash{from{opacity:0;transform:translateX(-160px)}to{opacity:1;transform:none}}
+/* ---------- Luz: el acierto tiene que verse desde el fondo de la sala ---------- */
 .flash{position:absolute;inset:0;z-index:25;pointer-events:none;
-  background:radial-gradient(circle,rgba(5,221,77,.5),transparent 70%);animation:fadeout .75s forwards}
-@keyframes fadeout{to{opacity:0}}
-.sweep{position:absolute;inset:0;z-index:25;pointer-events:none;overflow:hidden}
-.sweep::after{content:'';position:absolute;top:0;bottom:0;width:32%;
-  background:linear-gradient(90deg,transparent,rgba(5,221,77,.35),transparent);
-  animation:sweep 1s ease-out forwards}
-@keyframes sweep{from{left:-35%}to{left:105%}}
+  background:radial-gradient(circle at 50% 50%,rgba(180,255,210,.92),rgba(5,221,77,.6) 38%,transparent 74%);
+  animation:destello .85s ease-out forwards}
+@keyframes destello{
+  0%{opacity:0;transform:scale(.82)}
+  12%{opacity:1;transform:scale(1)}
+  100%{opacity:0;transform:scale(1.15)}}
+/* onda expansiva que acompaña al destello */
+.onda{position:absolute;left:50%;top:50%;z-index:26;pointer-events:none;
+  width:120px;height:120px;margin:-60px 0 0 -60px;border-radius:50%;
+  border:3px solid rgba(150,255,195,.95);animation:onda .85s cubic-bezier(.2,.7,.3,1) forwards}
+@keyframes onda{from{transform:scale(.3);opacity:1}to{transform:scale(11);opacity:0}}
+
+.sweep{position:absolute;inset:0;z-index:25;pointer-events:none;overflow:hidden;
+  background:radial-gradient(circle,rgba(5,221,77,.22),transparent 70%)}
+.sweep::after{content:'';position:absolute;top:0;bottom:0;width:42%;
+  background:linear-gradient(90deg,transparent,rgba(160,255,200,.85),rgba(5,221,77,.5),transparent);
+  filter:blur(2px);animation:sweep 1.35s cubic-bezier(.3,.1,.3,1) forwards}
+@keyframes sweep{from{left:-45%}to{left:110%}}
+
+/* Luz ambiente de la sala: late como un monitor, sobre el fondo ilustrado. */
+.latido{position:absolute;inset:0;z-index:2;pointer-events:none;
+  background:radial-gradient(60% 50% at 50% 46%,rgba(5,221,77,.20),transparent 70%);
+  animation:latido 2.6s ease-in-out infinite}
+@keyframes latido{0%,100%{opacity:.35}42%{opacity:.95}55%{opacity:.55}}
+
+/* Alarma: además del barrido, el borde de la pantalla respira en rojo. */
+.vineta{position:absolute;inset:0;z-index:24;pointer-events:none;
+  box-shadow:inset 0 0 140px 40px rgba(255,68,56,.75);animation:vineta .85s ease-in-out infinite}
+@keyframes vineta{0%,100%{opacity:.45}50%{opacity:1}}
+/* Interruptor de sonido: antes era un icono mudo y nadie lo encontraba. */
+.son{display:inline-flex;align-items:center;gap:9px;height:46px;padding:0 18px;
+  border-radius:999px;border:1px solid rgba(219,255,240,.35);background:rgba(2,26,21,.85);
+  color:rgba(219,255,240,.75);font-family:var(--disp);font-size:11px;
+  font-weight:700;letter-spacing:.16em;transition:.16s}
+.son span{font-size:16px;line-height:1}
+.son:hover{border-color:var(--green);color:var(--green)}
+.son.on{border-color:var(--green);color:var(--green);background:rgba(5,221,77,.14);
+  box-shadow:0 0 22px rgba(5,221,77,.35)}
+.avisoSon{margin-top:6px;padding:11px 24px;border-radius:999px;
+  border:1px dashed rgba(255,194,74,.7);background:rgba(255,194,74,.1);
+  color:var(--amber);font-family:var(--body);font-size:14px;font-weight:600;
+  animation:respira 2.2s ease-in-out infinite}
+.avisoSon:hover{background:rgba(255,194,74,.22)}
+@keyframes respira{50%{opacity:.55}}
 .hint{position:absolute;bottom:8px;left:12px;z-index:40;font-size:10px;letter-spacing:.1em;color:rgba(219,255,240,.3)}
 .brand{position:absolute;bottom:14px;right:16px;z-index:40;opacity:.5}
 .brand svg{height:16px;width:auto;display:block}
 .spin{width:38px;height:38px;border:3px solid rgba(5,221,77,.2);border-top-color:var(--green);
   border-radius:50%;animation:spin .8s linear infinite;margin:0 auto}
 @keyframes spin{to{transform:rotate(360deg)}}
+
+/* --- Debe ir al FINAL: sobrescribe reglas declaradas más arriba --- */
+/* «Reducir movimiento» apagaba TODAS las animaciones y dejaba el juego sin una
+   sola luz. Lo que molesta a quien activa esa opción es el desplazamiento y el
+   zoom, no el brillo: se quita el movimiento y se conserva la luz que informa. */
+@media (prefers-reduced-motion:reduce){
+  .bg{animation:none}                         /* fuera la deriva del fondo */
+  .onda{display:none}                         /* fuera la onda expansiva */
+  .sweep::after{animation:none;left:0;width:100%;filter:none;opacity:.5}
+  .slash{animation:none}
+  .node.avail:hover{transform:translate(-50%,-50%)}
+  .flash{animation:destelloQuieto .85s ease-out forwards}
+  .core{animation:nucleoQuieto 3.1s ease-in-out infinite}
+}
+@keyframes destelloQuieto{0%{opacity:0}12%{opacity:1}100%{opacity:0}}
+@keyframes nucleoQuieto{0%,100%{opacity:.45}50%{opacity:1}}
 </style>
 </head>
 <body>
@@ -259,54 +313,94 @@ function reset(){
         hechas:[], t0:Date.now(), estT0:0 };
 }
 
-/* ---------------- Sonido sintetizado ---------------- */
+/* ---------------- Sonido sintetizado ----------------
+   Todo pasa por una ganancia maestra: un solo sitio donde subir o bajar.
+   Los niveles se midieron con un analizador — los de la primera versión
+   picaban en 0,05–0,21 sobre 1,0, inaudibles en una sala. */
 const SFX = (()=>{
-  let ctx=null, amb=null, on=false;
-  const nuevo = ()=>{ if(!ctx) ctx = new (window.AudioContext||window.webkitAudioContext)(); return ctx; };
-  function tono(f1,f2,dur,tipo,vol){
-    if(!on) return; const c=nuevo(), o=c.createOscillator(), g=c.createGain();
-    o.type=tipo||'sine'; o.frequency.setValueAtTime(f1,c.currentTime);
-    if(f2) o.frequency.exponentialRampToValueAtTime(f2,c.currentTime+dur);
-    g.gain.setValueAtTime(0,c.currentTime);
-    g.gain.linearRampToValueAtTime(vol||.16,c.currentTime+.012);
-    g.gain.exponentialRampToValueAtTime(.0001,c.currentTime+dur);
-    o.connect(g).connect(c.destination); o.start(); o.stop(c.currentTime+dur+.03);
+  let ctx=null, master=null, amb=null, on=false;
+  const MAESTRO = 0.9;
+  function nuevo(){
+    if(!ctx){
+      ctx = new (window.AudioContext||window.webkitAudioContext)();
+      master = ctx.createGain(); master.gain.value = MAESTRO;
+      master.connect(ctx.destination);
+    }
+    return ctx;
+  }
+  /** Un golpe de tono. dur en segundos, vol de 0 a 1 antes de la maestra. */
+  function tono(f1,f2,dur,tipo,vol,retraso){
+    if(!on) return; const c=nuevo(), t=c.currentTime+(retraso||0);
+    const o=c.createOscillator(), g=c.createGain();
+    o.type=tipo||'sine'; o.frequency.setValueAtTime(f1,t);
+    if(f2) o.frequency.exponentialRampToValueAtTime(f2,t+dur);
+    g.gain.setValueAtTime(0,t);
+    g.gain.linearRampToValueAtTime(vol,t+.015);
+    g.gain.exponentialRampToValueAtTime(.0001,t+dur);
+    o.connect(g).connect(master); o.start(t); o.stop(t+dur+.05);
+  }
+  /** Ruido filtrado, para golpes y barridos. */
+  function ruido(dur,f0,f1,vol){
+    if(!on) return; const c=nuevo(), t=c.currentTime;
+    const n=c.createBufferSource(), b=c.createBuffer(1, c.sampleRate*dur, c.sampleRate);
+    const d=b.getChannelData(0);
+    for(let i=0;i<d.length;i++) d[i]=(Math.random()*2-1);
+    n.buffer=b;
+    const f=c.createBiquadFilter(); f.type='bandpass';
+    f.frequency.setValueAtTime(f0,t); f.frequency.exponentialRampToValueAtTime(f1,t+dur);
+    f.Q.value=1.4;
+    const g=c.createGain();
+    g.gain.setValueAtTime(0,t); g.gain.linearRampToValueAtTime(vol,t+.02);
+    g.gain.exponentialRampToValueAtTime(.0001,t+dur);
+    n.connect(f).connect(g).connect(master); n.start(t); n.stop(t+dur);
   }
   return {
     get activo(){ return on; },
     alternar(){
-      on=!on;
-      if(on){ const c=nuevo(); if(c.state==='suspended') c.resume(); this.ambiente(); }
+      on = !on;
+      if(on){ const c=nuevo(); if(c.state==='suspended') c.resume(); this.ambiente(); this.abrir(); }
       else if(amb){ amb.o.stop(); amb.o2.stop(); amb=null; }
       return on;
     },
-    ambiente(){
+    ambiente(){                                  /* zumbido de sala, audible */
       if(!on||amb) return; const c=nuevo();
-      const o=c.createOscillator(), o2=c.createOscillator(), g=c.createGain(), f=c.createBiquadFilter();
-      o.type='sine'; o.frequency.value=54; o2.type='sine'; o2.frequency.value=81;
-      f.type='lowpass'; f.frequency.value=260; g.gain.value=.05;
-      o.connect(f); o2.connect(f); f.connect(g).connect(c.destination); o.start(); o2.start();
+      const o=c.createOscillator(), o2=c.createOscillator();
+      const g=c.createGain(), f=c.createBiquadFilter(), lfo=c.createOscillator(), lg=c.createGain();
+      o.type='sine';  o.frequency.value=55;
+      o2.type='sine'; o2.frequency.value=82.5;
+      f.type='lowpass'; f.frequency.value=320;
+      g.gain.value=.16;
+      lfo.frequency.value=.18; lg.gain.value=.05;   /* respiración lenta */
+      lfo.connect(lg).connect(g.gain);
+      o.connect(f); o2.connect(f); f.connect(g).connect(master);
+      o.start(); o2.start(); lfo.start();
       amb={o,o2,g};
     },
-    pulso(){ tono(880,null,.09,'sine',.10); },
-    clic(){  tono(420,null,.05,'square',.05); },
-    acierto(){ tono(660,1320,.34,'sine',.20); },
-    fallo(){ tono(300,90,.75,'sawtooth',.22); },
-    abrir(){ tono(520,1560,.5,'triangle',.20); },
-    tic(){   tono(1500,null,.04,'square',.07); }
+    pulso(){  tono(920,null,.13,'sine',.40); tono(1380,null,.07,'sine',.16,.03); },
+    clic(){   tono(520,null,.06,'square',.20); },
+    acierto(){ tono(660,null,.16,'sine',.50); tono(990,null,.30,'sine',.45,.12);
+               tono(1320,null,.40,'triangle',.30,.24); },
+    fallo(){  tono(320,70,.95,'sawtooth',.60); ruido(.5,1400,180,.28); },
+    abrir(){  tono(520,1560,.55,'triangle',.52); tono(780,2340,.45,'sine',.26,.08);
+              ruido(.55,600,4200,.16); },
+    tic(){    tono(1700,null,.05,'square',.34); },
+    entrar(){ tono(180,60,.7,'sine',.42); ruido(.6,300,90,.2); }
   };
 })();
 
 /* ---------------- Piezas comunes ---------------- */
-function fondoDe(url){
+/** latido=true añade la luz ambiente que respira, para las pantallas de juego. */
+function fondoDe(url, latido){
   return `<div class="bg" style="background-image:url('${esc(url)}')"></div>
-          <div class="scrim"></div><div class="grain"></div>`;
+          <div class="scrim"></div>${latido?'<div class="latido"></div>':''}<div class="grain"></div>`;
 }
 function barra({reloj=false,casa=true,atras=false}={}){
   return `<div class="top"><div class="tl">
       ${casa?`<button class="ico" data-a="salir" title="Salir">⌂</button>`:''}
       ${atras?`<button class="ico" data-a="mapa" title="Volver al mapa">↺</button>`:''}
-      <button class="ico" data-a="sonido" title="Sonido">${SFX.activo?'🔊':'🔇'}</button>
+      <button class="son ${SFX.activo?'on':''}" data-a="sonido"
+        title="${SFX.activo?'Silenciar':'Activar sonido'}">
+        <span>${SFX.activo?'🔊':'🔇'}</span>${SFX.activo?'SONIDO':'SIN SONIDO'}</button>
     </div><div class="tr">
       <div class="score">${S.puntos} PTS</div>
       ${reloj?`<div class="timer" id="timer">--:--</div>`:''}
@@ -344,6 +438,8 @@ function pPortada(){
         <h1 style="margin-top:12px">${esc(GAME.titulo)}</h1>
       </div>
       <button class="btn solid" data-a="registro">${esc(GAME.botonInicio)} →</button>
+      ${SFX.activo ? '' : `<button class="avisoSon" data-a="sonido">
+        🔇 El sonido está apagado — tócalo para encenderlo</button>`}
     </div></div>
     <div class="hint">F pantalla completa · R reiniciar</div></div>`);
 }
@@ -438,7 +534,7 @@ function pPregunta(){
   const seg = segDe(e,q);
   // El candado va DESPUÉS de las preguntas: no es "4/3", es la clave de salida.
   const esCandado = S.q >= e.preguntas.length;
-  pinta(`<div class="screen">${fondoDe(e.fondo)}
+  pinta(`<div class="screen">${fondoDe(e.fondo, true)}
     <div class="layer">${barra({reloj:seg!=null, atras:true})}${vitales()}
       <div class="wrap"><div class="panel">
         ${esCandado
@@ -508,7 +604,7 @@ async function enviar(porTiempo){
 
   if(r.correcta){
     SFX.acierto();
-    const f = document.createElement('div'); f.className='flash'; stage.appendChild(f);
+    ['flash','onda'].forEach(c=>{ const d=document.createElement('div'); d.className=c; stage.appendChild(d); });
     setTimeout(()=> r.estacion_superada ? completarEstacion() : siguiente(), 1150);
   } else {
     setTimeout(fallar, 650);
@@ -533,7 +629,7 @@ function marcar(ok){
 function fallar(){
   locked = true; SFX.fallo();
   const ov = document.createElement('div'); ov.className='ov'; ov.id='alarm';
-  ov.innerHTML = `<div class="mask"></div><div class="slash"></div>
+  ov.innerHTML = `<div class="mask"></div><div class="slash"></div><div class="vineta"></div>
     <div class="ovbox"><h2>${esc(T.alarmaTitulo)}</h2><p>${esc(T.alarmaTexto)}</p>
       <div class="row">
         <button class="btn solid" data-a="reintentar">REPETIR ↻</button>
@@ -551,7 +647,7 @@ function siguiente(){
 /* ---------------- Candado ---------------- */
 function pCandado(c){
   const e = EST[S.est];
-  pinta(`<div class="screen">${fondoDe(e.fondo)}
+  pinta(`<div class="screen">${fondoDe(e.fondo, true)}
     <div class="layer">${barra({atras:true})}${vitales()}
       <div class="wrap"><div class="panel" style="text-align:center;max-width:760px">
         <div class="kicker">${esc(c.titulo)}</div>
@@ -667,7 +763,7 @@ stage.addEventListener('click', async ev=>{
     case 'entrar':       await entrar(); break;
     case 'mapa':         pMapa(); break;
     case 'estacion':     S.est=+t.dataset.i; S.q=0; pBriefing(); break;
-    case 'empezar':      S.estT0=Date.now(); pPregunta(); break;
+    case 'empezar':      S.estT0=Date.now(); SFX.entrar(); pPregunta(); break;
     case 'enviar':       await enviar(false); break;
     case 'reintentar':   pPregunta(); break;
     case 'probar':       await probarCodigo(); break;
