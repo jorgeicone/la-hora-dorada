@@ -310,7 +310,9 @@ const mmss = s => { s=Math.max(0,Math.floor(s));
 let S, timerId=null, timeLeft=0, locked=false, work=null;
 function reset(){
   S = { partida:null, equipo:'', est:0, q:0, puntos:0, aciertos:0, intentos:0,
-        hechas:[], t0:Date.now(), estT0:0 };
+        hechas:[], t0:Date.now(), estT0:0,
+        resp:{},        // respuestas de la estacion en curso: { codigo: valor }
+        cerrando:false, agotado:false };
 }
 
 /* ---------------- Sonido sintetizado ----------------
@@ -502,197 +504,217 @@ function pBriefing(){
     <div class="floatbtn"><button class="btn solid" data-a="empezar">${esc(T.siguiente)} →</button></div></div>`);
 }
 const tipoDe = (e,q) => q.tipoReto || e.tipoReto;
-const segDe  = (e,q) => q.tiempoPorPregunta !== undefined ? q.tiempoPorPregunta : e.tiempoPorPregunta;
+/* El reloj es de ESTACION (12 min), no por pregunta: parametro del cliente. */
+const segEstacion = e => e.tiempoMaxSeg || 720;
 const preguntaActual = () => {
   const e = EST[S.est];
   return S.q < e.preguntas.length ? e.preguntas[S.q] : e.candadoDespues;
 };
 
-function pPregunta(){
-  const e = EST[S.est], q = preguntaActual(), t = tipoDe(e,q);
-  locked = false;
-  if(t === 'CODE') return pCandado(q);
+/* Preguntas de la estacion, con el candado de salida al final. */
+function preguntasDe(e){ return e.candadoDespues ? e.preguntas.concat([e.candadoDespues]) : e.preguntas.slice(); }
 
-  let cuerpo='';
-  if(t === 'SORT'){
-    work = q.items.slice();               // ya vienen barajados del servidor
-    cuerpo = filasSort();
-  } else if(t === 'MULTI'){
-    work = new Set();
-    cuerpo = q.opciones.map((o,i)=>
-      `<button class="opt" data-multi="${i}"><span class="box"></span>${esc(o.texto)}</button>`).join('');
-  } else if(t === 'TRUEFALSE'){
-    work = null;
-    cuerpo = `<div class="tf">
-      <button class="opt" data-tf="true"><span class="box"></span>VERDADERO</button>
-      <button class="opt" data-tf="false"><span class="box"></span>FALSO</button></div>`;
-  } else {
-    work = null;
-    cuerpo = q.opciones.map((o,i)=>
-      `<button class="opt" data-single="${i}"><span class="box">${'ABCD'[i]||i+1}</span>${esc(o.texto)}</button>`).join('');
-  }
-  const seg = segDe(e,q);
-  // El candado va DESPUÉS de las preguntas: no es "4/3", es la clave de salida.
-  const esCandado = S.q >= e.preguntas.length;
-  pinta(`<div class="screen">${fondoDe(e.fondo, true)}
-    <div class="layer">${barra({reloj:seg!=null, atras:true})}${vitales()}
-      <div class="wrap"><div class="panel">
-        ${esCandado
-          ? `<div class="kicker" style="margin-bottom:14px">${esc(q.titulo || 'CLAVE DE SALIDA')}</div>`
-          : `<div class="qnum">${S.q+1}/${e.preguntas.length}</div>`}
-        <p class="qtext">${esc(q.enunciado)}</p>
-        ${esCandado && q.pista
-          ? `<p style="font-size:14px;color:var(--amber);margin:-10px 0 18px">▸ ${esc(q.pista)}</p>` : ''}
-        <div id="cuerpo">${cuerpo}</div>
-        <div class="qfoot"><button class="btn solid" id="enviar" data-a="enviar">${esc(T.enviar)}</button></div>
-      </div></div></div></div>`);
-  SFX.pulso();
-  if(seg != null) arrancarReloj(seg);
-}
-function filasSort(){
-  return work.map((it,i)=>`<div class="srow">
-    <div class="idx">${i+1}</div><div class="body">${esc(it.texto)}</div>
-    <div class="arrows">
-      <button data-up="${i}" ${i===0?'disabled':''} aria-label="Subir">▲</button>
-      <button data-down="${i}" ${i===work.length-1?'disabled':''} aria-label="Bajar">▼</button>
-    </div></div>`).join('');
-}
+/* ---------- Reloj de estacion: 12 minutos, parametro del cliente ---------- */
 function arrancarReloj(seg){
-  timeLeft = seg;
-  const pintarReloj = ()=>{ const el=document.getElementById('timer'); if(!el) return;
-    el.textContent = mmss(timeLeft);
-    el.className = 'timer' + (timeLeft<=5?' crit' : timeLeft<=10?' warn' : ''); };
-  pintarReloj();
-  timerId = setInterval(()=>{
+  timeLeft = seg; S.agotado = false;
+  clearInterval(timerId);
+  timerId = setInterval(function(){
     timeLeft--; pintarReloj();
-    if(timeLeft<=5 && timeLeft>0) SFX.tic();
-    if(timeLeft<=0){ clearInterval(timerId); timerId=null; enviar(true); }
-  },1000);
+    if(timeLeft<=10 && timeLeft>0) SFX.tic();
+    if(timeLeft<=0){ clearInterval(timerId); timerId=null; S.agotado=true; alarmaTiempo(); }
+  }, 1000);
+  pintarReloj();
 }
-
-/* =========================================================================
-   ENVÍO — la corrección la hace el servidor. Aquí no hay respuestas.
-   ========================================================================= */
-function cargaUtil(){
-  const e = EST[S.est], t = tipoDe(e, preguntaActual());
-  if(t === 'SORT')      return work.map(it=>it.id);
-  if(t === 'MULTI')     return [...work];
-  if(t === 'TRUEFALSE') return work;
-  return work;                        // SINGLE: índice
+function pintarReloj(){
+  const el = document.getElementById('timer'); if(!el) return;
+  el.textContent = mmss(timeLeft);
+  el.className = 'timer' + (timeLeft<=60 ? ' crit' : timeLeft<=240 ? ' warn' : '');
 }
-async function enviar(porTiempo){
-  if(locked) return; locked = true;
-  if(timerId){ clearInterval(timerId); timerId=null; }
-  const e = EST[S.est], q = preguntaActual();
-  const b = document.getElementById('enviar');
-  if(b){ b.disabled = true; b.textContent = T.enviado; }
-
-  if(!porTiempo && work == null){ locked=false; if(b){b.disabled=false;b.textContent=T.enviar;} return; }
-
-  let r;
-  try {
-    r = await rpc('evoforma2_responder', {
-      p_partida: S.partida, p_estacion: e.id, p_codigo: q.codigo,
-      p_respuesta: porTiempo ? null : cargaUtil(),
-      p_seg_restantes: Math.max(0, timeLeft)
-    });
-  } catch(err){ locked=false; return pError(err.message); }
-
-  S.puntos = r.puntos; S.aciertos = r.aciertos; S.intentos = r.intentos;
-  S.hechas = r.estaciones_ok || [];
-  marcar(r.correcta);
-
-  if(r.correcta){
-    SFX.acierto();
-    ['flash','onda'].forEach(c=>{ const d=document.createElement('div'); d.className=c; stage.appendChild(d); });
-    setTimeout(()=> r.estacion_superada ? completarEstacion() : siguiente(), 1150);
-  } else {
-    setTimeout(fallar, 650);
-  }
-}
-/* Solo se marca lo que el equipo eligió: el servidor no dice cuál era la buena,
-   así REPETIR sigue exigiendo pensar. */
-function marcar(ok){
-  const e = EST[S.est], t = tipoDe(e, preguntaActual()), clase = ok?'ok':'bad';
-  if(t === 'SORT'){ document.querySelectorAll('.srow').forEach(r=>r.classList.add(clase)); }
-  else if(t === 'MULTI'){
-    document.querySelectorAll('[data-multi]').forEach(b=>{ b.disabled=true;
-      if(work.has(+b.dataset.multi)) b.classList.add(clase); });
-  } else if(t === 'TRUEFALSE'){
-    document.querySelectorAll('[data-tf]').forEach(b=>{ b.disabled=true;
-      if((b.dataset.tf==='true')===work) b.classList.add(clase); });
-  } else {
-    document.querySelectorAll('[data-single]').forEach(b=>{ b.disabled=true;
-      if(+b.dataset.single===work) b.classList.add(clase); });
-  }
-}
-function fallar(){
-  locked = true; SFX.fallo();
+/* Se agotaron los 12 minutos. Se puede cerrar igual, pero sin bonificacion. */
+function alarmaTiempo(){
+  if(document.getElementById('alarm')) return;
+  SFX.fallo();
   const ov = document.createElement('div'); ov.className='ov'; ov.id='alarm';
-  ov.innerHTML = `<div class="mask"></div><div class="slash"></div><div class="vineta"></div>
-    <div class="ovbox"><h2>${esc(T.alarmaTitulo)}</h2><p>${esc(T.alarmaTexto)}</p>
-      <div class="row">
-        <button class="btn solid" data-a="reintentar">REPETIR ↻</button>
-        <button class="btn ghost" data-a="mapa">${esc(T.volverAlMapa)}</button>
-      </div></div>`;
+  ov.innerHTML = '<div class="mask"></div><div class="slash"></div><div class="vineta"></div>'
+    + '<div class="ovbox"><h2>SE AGOT&Oacute; EL TIEMPO</h2>'
+    + '<p>Pasaron los ' + mmss(segEstacion(EST[S.est])) + ' de la estaci&oacute;n. '
+    + 'Pueden cerrarla igual: conservan los puntos de sus respuestas, pero sin bonificaci&oacute;n.</p>'
+    + '<div class="row">'
+    + '<button class="btn solid" data-a="revisar">REVISAR Y CERRAR</button>'
+    + '<button class="btn ghost" data-a="mapa">' + esc(T.volverAlMapa) + '</button>'
+    + '</div></div>';
   stage.appendChild(ov);
 }
-function siguiente(){
-  const e = EST[S.est];
-  if(S.q < e.preguntas.length - 1 || (S.q === e.preguntas.length - 1 && e.candadoDespues)){
-    S.q++; pPregunta();
-  } else completarEstacion();
-}
 
-/* ---------------- Candado ---------------- */
-function pCandado(c){
-  const e = EST[S.est];
-  pinta(`<div class="screen">${fondoDe(e.fondo, true)}
-    <div class="layer">${barra({atras:true})}${vitales()}
-      <div class="wrap"><div class="panel" style="text-align:center;max-width:760px">
-        <div class="kicker">${esc(c.titulo)}</div>
-        <p class="qtext" style="margin:16px 0 20px;font-size:18px">${esc(c.enunciado)}</p>
-        ${c.pista?`<p style="font-size:14px;color:var(--amber);margin-bottom:18px">▸ ${esc(c.pista)}</p>`:''}
-        <input class="lockin" id="codigo" maxlength="20" placeholder="${esc(c.placeholder||'')}" autocomplete="off">
-        <div class="lockerr" id="lockerr"></div>
-        <button class="btn solid" style="margin-top:6px" data-a="probar">${esc(c.boton||'DESBLOQUEAR')}</button>
-      </div></div></div></div>`);
-  setTimeout(()=>document.getElementById('codigo')?.focus(), 60);
-}
-async function probarCodigo(){
-  const e = EST[S.est], c = preguntaActual();
-  const inp = document.getElementById('codigo'), err = document.getElementById('lockerr');
-  if(!inp.value.trim()) return;
-  let r;
-  try {
-    r = await rpc('evoforma2_responder', { p_partida:S.partida, p_estacion:e.id,
-      p_codigo:c.codigo, p_respuesta:inp.value.trim(), p_seg_restantes:0 });
-  } catch(x){ return pError(x.message); }
-  S.puntos=r.puntos; S.aciertos=r.aciertos; S.intentos=r.intentos; S.hechas=r.estaciones_ok||[];
-  if(r.correcta){
-    SFX.abrir();
-    const s=document.createElement('div'); s.className='sweep'; stage.appendChild(s);
-    setTimeout(completarEstacion, 950);
+function totalPreguntas(e){ return e.preguntas.length + (e.candadoDespues?1:0); }
+
+function pPregunta(){
+  const e = EST[S.est], qs = preguntasDe(e), q = qs[S.q], t = tipoDe(e,q);
+  const guardado = S.resp[q.codigo];
+  const esCandado = S.q >= e.preguntas.length;
+  let cuerpo = '';
+
+  if(t === 'CODE'){
+    cuerpo = '<input class="lockin" id="codigo" maxlength="20" autocomplete="off" placeholder="'
+           + esc(q.placeholder||'') + '" value="' + esc(guardado||'') + '">';
+  } else if(t === 'SORT'){
+    if(!guardado) S.resp[q.codigo] = q.items.map(function(i){ return i.id; });
+    cuerpo = '<div class="sort" id="cuerpo">' + filasSort(q) + '</div>';
+  } else if(t === 'MULTI'){
+    const sel = new Set(guardado||[]);
+    cuerpo = '<div id="cuerpo">' + q.opciones.map(function(o,i){
+      return '<button class="opt ' + (sel.has(i)?'sel':'') + '" data-multi="' + i + '">'
+           + '<span class="box">' + (sel.has(i)?'&#10003;':'') + '</span>' + esc(o.texto) + '</button>';
+    }).join('') + '</div><p style="font-size:14px;color:rgba(219,255,240,.6);margin-top:10px">'
+      + 'Puede haber m&aacute;s de una correcta.</p>';
+  } else if(t === 'TRUEFALSE'){
+    cuerpo = '<div class="tf" id="cuerpo">'
+      + [['true','VERDADERO'],['false','FALSO']].map(function(par){
+          const on = guardado === (par[0]==='true');
+          return '<button class="opt ' + (on?'sel':'') + '" data-tf="' + par[0] + '">'
+               + '<span class="box">' + (on?'&#10003;':'') + '</span>' + par[1] + '</button>';
+        }).join('') + '</div>';
   } else {
-    err.textContent = 'Clave incorrecta. Revisen el registro del Copiloto.';
-    inp.value=''; inp.focus(); SFX.fallo();
-    document.querySelector('.score').textContent = S.puntos + ' PTS';
+    cuerpo = '<div id="cuerpo">' + q.opciones.map(function(o,i){
+      return '<button class="opt ' + (guardado===i?'sel':'') + '" data-single="' + i + '">'
+           + '<span class="box">' + ('ABCD'[i]||(i+1)) + '</span>' + esc(o.texto) + '</button>';
+    }).join('') + '</div>';
+  }
+
+  const cabecera = esCandado
+    ? '<div class="kicker" style="margin-bottom:14px">' + esc(q.titulo||'CLAVE DE SALIDA') + '</div>'
+    : '<div class="qnum">' + (S.q+1) + '/' + totalPreguntas(e) + '</div>';
+  const pista = q.pista
+    ? '<p style="font-size:14px;color:var(--amber);margin:-10px 0 18px">&#9656; ' + esc(q.pista) + '</p>'
+    : '';
+  const avance = (S.q < qs.length-1)
+    ? '<button class="btn solid" data-a="despues">SIGUIENTE &rarr;</button>'
+    : '<button class="btn solid" data-a="revisar">' + esc(T.revisar||'REVISAR RESPUESTAS') + ' &rarr;</button>';
+
+  pinta('<div class="screen">' + fondoDe(e.fondo, true)
+    + '<div class="layer">' + barra({reloj:true, atras:true}) + vitales()
+    + '<div class="wrap"><div class="panel">'
+    + cabecera
+    + '<p class="qtext">' + esc(q.enunciado) + '</p>'
+    + pista + cuerpo
+    + '<div class="qfoot" style="justify-content:space-between">'
+    + '<button class="btn ghost" data-a="antes" ' + (S.q===0?'disabled':'') + '>&larr; ANTERIOR</button>'
+    + avance
+    + '</div></div></div></div></div>');
+
+  SFX.pulso();
+  pintarReloj();
+  if(t === 'CODE'){
+    const inp = document.getElementById('codigo');
+    inp.addEventListener('input', function(){ S.resp[q.codigo] = inp.value.trim(); });
+    setTimeout(function(){ inp.focus(); }, 60);
   }
 }
 
-function completarEstacion(){
-  const e = EST[S.est];
-  if(!S.hechas.includes(e.id)) S.hechas.push(e.id);
-  pinta(`<div class="screen">${fondoDe(e.fondo)}
-    <div class="layer">${barra({casa:false})}${vitales()}
-      <div class="wrap"><div class="panel" style="text-align:center">
-        <div class="kicker">${esc(e.signoVital||'')} RECUPERADO</div>
-        <div style="font-size:46px;margin:16px 0">🫀</div>
-        <p class="narr">${esc(e.mensajeExito)}</p>
-      </div></div></div>
-    <div class="floatbtn"><button class="btn solid" data-a="trasEstacion">${esc(T.siguiente)} →</button></div></div>`);
-  SFX.acierto();
+function filasSort(q){
+  const ids = S.resp[q.codigo];
+  const texto = function(id){ const it = q.items.find(function(i){ return i.id===id; });
+                              return it ? it.texto : ''; };
+  return ids.map(function(id,i){
+    return '<div class="srow"><div class="idx">' + (i+1) + '</div>'
+         + '<div class="body">' + esc(texto(id)) + '</div><div class="arrows">'
+         + '<button data-up="' + i + '" ' + (i===0?'disabled':'') + ' aria-label="Subir">&#9650;</button>'
+         + '<button data-down="' + i + '" ' + (i===ids.length-1?'disabled':'') + ' aria-label="Bajar">&#9660;</button>'
+         + '</div></div>';
+  }).join('');
 }
+
+/* ---------- Revision antes de cerrar ---------- */
+function textoDe(e,q,r){
+  const t = tipoDe(e,q);
+  if(r===undefined||r===null||r==='') return null;
+  if(t==='CODE')      return r;
+  if(t==='TRUEFALSE') return r ? 'Verdadero' : 'Falso';
+  if(t==='SORT')      return r.map(function(id){
+      const it = q.items.find(function(i){ return i.id===id; }); return it?it.texto:''; }).join('  \u2192  ');
+  if(t==='MULTI')     return r.length ? r.slice().sort().map(function(i){ return q.opciones[i].texto; }).join('  \u00b7  ') : null;
+  return q.opciones[r] ? q.opciones[r].texto : null;
+}
+
+function pRevision(){
+  const e = EST[S.est], qs = preguntasDe(e);
+  const faltan = qs.filter(function(q){ return textoDe(e,q,S.resp[q.codigo])===null; }).length;
+  const filas = qs.map(function(q,i){
+    const tx = textoDe(e,q,S.resp[q.codigo]);
+    return '<button class="opt" data-a="ir-q" data-i="' + i + '" style="align-items:flex-start">'
+         + '<span class="box">' + esc(q.codigo) + '</span>'
+         + '<span style="flex:1;text-align:left">'
+         + (tx ? esc(tx) : '<i style="opacity:.5">Sin responder</i>') + '</span>'
+         + '<span style="font-size:12px;color:var(--green)">CAMBIAR</span></button>';
+  }).join('');
+  const aviso = faltan
+    ? '<p style="color:var(--amber);font-size:14px;margin-top:14px">Quedan ' + faltan
+      + ' sin responder. Esos puntos se pierden.</p>' : '';
+
+  pinta('<div class="screen">' + fondoDe(e.fondo, true)
+    + '<div class="layer">' + barra({reloj:true, atras:true}) + vitales()
+    + '<div class="wrap"><div class="panel">'
+    + '<div class="kicker" style="margin-bottom:6px">ANTES DE CERRAR LA ESTACI&Oacute;N</div>'
+    + '<p style="font-size:15px;color:rgba(219,255,240,.75);margin-bottom:18px">'
+    + 'Al validar se detiene el cron&oacute;metro y el registro es definitivo.</p>'
+    + filas + aviso
+    + '<div class="qfoot" style="justify-content:space-between">'
+    + '<button class="btn ghost" data-a="ir-q" data-i="' + (qs.length-1) + '">&larr; VOLVER</button>'
+    + '<button class="btn solid" id="cerrar" data-a="cerrar">&#10003; ' + esc(T.enviar) + '</button>'
+    + '</div></div></div></div></div>');
+  pintarReloj();
+}
+
+/* ---------- Cierre: una sola validacion, como pide el insumo ---------- */
+async function cerrarEstacion(){
+  if(S.cerrando) return; S.cerrando = true;
+  clearInterval(timerId); timerId = null;
+  const e = EST[S.est];
+  const b = document.getElementById('cerrar');
+  if(b){ b.disabled = true; b.textContent = 'REGISTRANDO...'; }
+  const usados = segEstacion(e) - Math.max(0, timeLeft);
+  let r;
+  try{
+    r = await rpc('evoforma2_cerrar', { p_partida:S.partida, p_estacion:e.id,
+      p_respuestas:S.resp, p_seg_usados:usados });
+  }catch(x){ S.cerrando=false; return pError(x.message); }
+  S.puntos = r.puntos_total; S.aciertos += r.aciertos; S.hechas = r.estaciones_ok||[];
+  S.cerrando = false;
+  pResultadoEstacion(e, r);
+}
+
+function pResultadoEstacion(e, r){
+  SFX.acierto();
+  ['flash','onda'].forEach(function(c){
+    const d = document.createElement('div'); d.className = c; stage.appendChild(d); });
+  const detalle = r.detalle.map(function(d){
+    return '<div class="opt ' + (d.correcta?'ok':'bad') + '" style="cursor:default">'
+         + '<span class="box">' + (d.correcta?'&#10003;':'&#10007;') + '</span>'
+         + '<span style="flex:1;text-align:left;font-size:15px">' + esc(d.titulo).slice(0,80) + '</span>'
+         + '<span style="font-family:var(--disp)">' + d.puntos + '/' + d.puntos_max + '</span></div>';
+  }).join('');
+
+  pinta('<div class="screen">' + fondoDe(e.fondo, true)
+    + '<div class="layer">' + barra({casa:false}) + vitales()
+    + '<div class="wrap"><div class="panel">'
+    + '<div class="kicker" style="text-align:center">' + esc(e.signoVital||'') + ' RECUPERADO</div>'
+    + '<div style="text-align:center;margin:14px 0 6px">'
+    + '<span style="font-family:var(--disp);font-size:64px;font-weight:900;color:var(--green)">'
+    + r.puntos_estacion + '</span>'
+    + '<span style="font-family:var(--disp);font-size:24px;color:rgba(219,255,240,.5)">/20</span></div>'
+    + '<div class="kpis">'
+    + '<div class="kpi"><b>' + r.puntos_preguntas + '</b><span>RESPUESTAS</span></div>'
+    + '<div class="kpi"><b>+' + r.puntos_tiempo + '</b><span>BONO TIEMPO</span></div>'
+    + '<div class="kpi"><b>' + mmss(r.seg_usados) + '</b><span>TIEMPO</span></div>'
+    + '<div class="kpi"><b>' + r.aciertos + '/' + r.preguntas + '</b><span>ACIERTOS</span></div>'
+    + '</div>'
+    + '<p style="text-align:center;font-size:13px;color:rgba(219,255,240,.6);margin:6px 0 14px">'
+    + esc(r.rango_tiempo) + '</p>' + detalle
+    + '</div></div></div>'
+    + '<div class="floatbtn"><button class="btn solid" data-a="trasEstacion">'
+    + esc(T.siguiente) + ' &rarr;</button></div></div>');
+}
+
 function trasEstacion(){ S.hechas.length === EST.length ? pInforme() : pMapa(); }
 
 async function pInforme(){
@@ -740,33 +762,44 @@ stage.addEventListener('click', async ev=>{
   const t = ev.target.closest('[data-a],[data-single],[data-multi],[data-tf],[data-up],[data-down]');
   if(!t) return;
 
+  const qActual = () => preguntasDe(EST[S.est])[S.q];
   if(t.dataset.up !== undefined || t.dataset.down !== undefined){
-    const i=+(t.dataset.up ?? t.dataset.down), j = t.dataset.up!==undefined ? i-1 : i+1;
-    [work[i],work[j]]=[work[j],work[i]];
-    document.getElementById('cuerpo').innerHTML = filasSort(); SFX.clic(); return;
+    const q = qActual(), ids = S.resp[q.codigo];
+    const i = +(t.dataset.up ?? t.dataset.down), j = t.dataset.up!==undefined ? i-1 : i+1;
+    [ids[i],ids[j]] = [ids[j],ids[i]];
+    document.getElementById('cuerpo').innerHTML = filasSort(q); SFX.clic(); return;
   }
-  if(t.dataset.multi !== undefined){ if(locked) return;
-    const i=+t.dataset.multi;
-    if(work.has(i)){ work.delete(i); t.classList.remove('sel'); t.querySelector('.box').textContent=''; }
-    else { work.add(i); t.classList.add('sel'); t.querySelector('.box').textContent='✓'; }
-    SFX.clic(); return; }
-  if(t.dataset.tf !== undefined){ if(locked) return; work = t.dataset.tf==='true';
+  if(t.dataset.multi !== undefined){
+    const q = qActual(), i = +t.dataset.multi;
+    const cur = new Set(S.resp[q.codigo]||[]);
+    if(cur.has(i)){ cur.delete(i); t.classList.remove('sel'); t.querySelector('.box').textContent=''; }
+    else { cur.add(i); t.classList.add('sel'); t.querySelector('.box').textContent='\u2713'; }
+    S.resp[q.codigo] = [...cur]; SFX.clic(); return; }
+  if(t.dataset.tf !== undefined){
+    S.resp[qActual().codigo] = t.dataset.tf==='true';
     document.querySelectorAll('[data-tf]').forEach(b=>{b.classList.remove('sel');b.querySelector('.box').textContent='';});
-    t.classList.add('sel'); t.querySelector('.box').textContent='✓'; SFX.clic(); return; }
-  if(t.dataset.single !== undefined){ if(locked) return; work = +t.dataset.single;
-    document.querySelectorAll('[data-single]').forEach((b,i)=>{ b.classList.toggle('sel', i===work);
+    t.classList.add('sel'); t.querySelector('.box').textContent='\u2713'; SFX.clic(); return; }
+  if(t.dataset.single !== undefined){
+    const sel = +t.dataset.single;
+    S.resp[qActual().codigo] = sel;
+    document.querySelectorAll('[data-single]').forEach((b,i)=>{ b.classList.toggle('sel', i===sel);
       b.querySelector('.box').textContent='ABCD'[i]||i+1; });
     SFX.clic(); return; }
 
   switch(t.dataset.a){
     case 'registro':     pRegistro(); break;
     case 'entrar':       await entrar(); break;
-    case 'mapa':         pMapa(); break;
-    case 'estacion':     S.est=+t.dataset.i; S.q=0; pBriefing(); break;
-    case 'empezar':      S.estT0=Date.now(); SFX.entrar(); pPregunta(); break;
-    case 'enviar':       await enviar(false); break;
-    case 'reintentar':   pPregunta(); break;
-    case 'probar':       await probarCodigo(); break;
+    case 'mapa':         clearInterval(timerId); timerId=null;
+                         document.getElementById('alarm')?.remove(); pMapa(); break;
+    case 'estacion':     S.est=+t.dataset.i; S.q=0; S.resp={}; pBriefing(); break;
+    case 'empezar':      S.estT0=Date.now(); SFX.entrar();
+                         arrancarReloj(segEstacion(EST[S.est])); pPregunta(); break;
+    case 'antes':        if(S.q>0){ S.q--; pPregunta(); } break;
+    case 'despues':      S.q++; pPregunta(); break;
+    case 'ir-q':         document.getElementById('alarm')?.remove();
+                         S.q = +t.dataset.i; pPregunta(); break;
+    case 'revisar':      document.getElementById('alarm')?.remove(); pRevision(); break;
+    case 'cerrar':       await cerrarEstacion(); break;
     case 'trasEstacion': trasEstacion(); break;
     case 'informe':      await pInforme(); break;
     case 'gracias':      pGracias(); break;
@@ -778,7 +811,8 @@ stage.addEventListener('click', async ev=>{
 });
 addEventListener('keydown', async e=>{
   const cod = document.getElementById('codigo');
-  if(e.key==='Enter' && cod && document.activeElement===cod){ await probarCodigo(); return; }
+  if(e.key==='Enter' && cod && document.activeElement===cod){
+    document.querySelector('[data-a="revisar"],[data-a="despues"]')?.click(); return; }
   const eq = document.getElementById('equipo');
   if(e.key==='Enter' && eq && document.activeElement===eq){ await entrar(); return; }
   if(cod || eq) return;
